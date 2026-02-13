@@ -34,23 +34,15 @@ export function usePlayground() {
   const [panels, setPanels] = useState<PanelState[]>([
     createPanel(0),
     createPanel(1),
+    createPanel(2),
+    createPanel(3),
+    createPanel(4),
   ])
 
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map())
 
-  // Ensure panel count matches settings
   const updatePanelCount = useCallback((count: number) => {
     setSettings((prev) => ({ ...prev, panelCount: count }))
-    setPanels((prev) => {
-      if (count > prev.length) {
-        const newPanels = [...prev]
-        for (let i = prev.length; i < count; i++) {
-          newPanels.push(createPanel(i))
-        }
-        return newPanels
-      }
-      return prev.slice(0, count)
-    })
   }, [])
 
   const updateApiKey = useCallback((apiKey: string) => {
@@ -68,17 +60,17 @@ export function usePlayground() {
   const updateSystemPrompt = useCallback(
     (panelId: number, prompt: string) => {
       setPanels((prev) =>
-        prev.map((p) => (p.id === panelId ? { ...p, systemPrompt: prompt } : p))
+        prev.map((p) =>
+          p.id === panelId ? { ...p, systemPrompt: prompt } : p
+        )
       )
     },
     []
   )
 
   const clearAllChats = useCallback(() => {
-    // Abort all ongoing requests
     abortControllersRef.current.forEach((controller) => controller.abort())
     abortControllersRef.current.clear()
-
     setPanels((prev) =>
       prev.map((p) => ({ ...p, messages: [], isLoading: false }))
     )
@@ -94,19 +86,20 @@ export function usePlayground() {
         content: userMessage,
       }
 
+      // Snapshot the current panels for building API payloads
+      const currentPanels = panels.slice(0, settings.panelCount)
+
       // Add user message to all active panels and set loading
       setPanels((prev) =>
-        prev.map((p) => ({
-          ...p,
-          messages: [...p.messages, userMsg],
-          isLoading: true,
-        }))
+        prev.map((p, idx) =>
+          idx < settings.panelCount
+            ? { ...p, messages: [...p.messages, userMsg], isLoading: true }
+            : p
+        )
       )
 
       // Send requests to all active panels simultaneously
-      const activePanels = panels.slice(0, settings.panelCount)
-
-      const promises = activePanels.map(async (panel) => {
+      const promises = currentPanels.map(async (panel) => {
         const assistantMsgId = generateId()
 
         // Add placeholder assistant message
@@ -116,19 +109,16 @@ export function usePlayground() {
               ? {
                   ...p,
                   messages: [
-                    ...p.messages,
+                    ...p.messages.filter((m) => m.id !== userMsg.id),
                     userMsg,
                     {
                       id: assistantMsgId,
-                      role: "assistant",
+                      role: "assistant" as const,
                       content: "",
                       thinking: "",
                       isStreaming: true,
                     },
-                  ].filter(
-                    (msg, idx, arr) =>
-                      arr.findIndex((m) => m.id === msg.id) === idx
-                  ),
+                  ],
                 }
               : p
           )
@@ -172,37 +162,57 @@ export function usePlayground() {
           const decoder = new TextDecoder()
           let accumulatedContent = ""
           let accumulatedThinking = ""
+          let buffer = ""
 
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
 
-            const chunk = decoder.decode(value, { stream: true })
-            const lines = chunk.split("\n")
+            buffer += decoder.decode(value, { stream: true })
+
+            // SSE lines are separated by \n\n; individual lines by \n
+            // Process complete lines only, keep partial last line in buffer
+            const lines = buffer.split("\n")
+            // The last element might be incomplete, keep it in buffer
+            buffer = lines.pop() || ""
 
             for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6)
-                if (data === "[DONE]") continue
+              const trimmed = line.trim()
+              if (!trimmed) continue
+
+              if (trimmed === "data: [DONE]") {
+                continue
+              }
+
+              if (trimmed.startsWith("data: ")) {
+                const jsonStr = trimmed.slice(6).trim()
+                if (!jsonStr) continue
 
                 try {
-                  const parsed = JSON.parse(data)
-                  if (parsed.thinking) {
-                    accumulatedThinking += parsed.thinking
-                  }
-                  if (parsed.content) {
-                    accumulatedContent += parsed.content
-                  }
-                  if (parsed.error) {
-                    accumulatedContent = `Error: ${parsed.error}`
+                  const parsed = JSON.parse(jsonStr)
+                  const choice = parsed.choices?.[0]
+
+                  if (choice?.delta) {
+                    const delta = choice.delta
+
+                    // Longcat OpenAI-compatible format: delta.content for text, delta.thinking for thinking
+                    if (delta.content != null && delta.content !== "") {
+                      accumulatedContent += delta.content
+                    }
+                    if (delta.thinking != null && delta.thinking !== "") {
+                      accumulatedThinking += delta.thinking
+                    }
                   }
                 } catch {
-                  // Skip malformed JSON
+                  // Skip malformed JSON chunks
                 }
               }
             }
 
             // Update the assistant message with accumulated content
+            const contentSnapshot = accumulatedContent
+            const thinkingSnapshot = accumulatedThinking
+
             setPanels((prev) =>
               prev.map((p) =>
                 p.id === panel.id
@@ -212,8 +222,8 @@ export function usePlayground() {
                         m.id === assistantMsgId
                           ? {
                               ...m,
-                              content: accumulatedContent,
-                              thinking: accumulatedThinking || undefined,
+                              content: contentSnapshot,
+                              thinking: thinkingSnapshot || undefined,
                               isStreaming: true,
                             }
                           : m
@@ -224,7 +234,32 @@ export function usePlayground() {
             )
           }
 
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            const trimmed = buffer.trim()
+            if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
+              const jsonStr = trimmed.slice(6).trim()
+              try {
+                const parsed = JSON.parse(jsonStr)
+                const choice = parsed.choices?.[0]
+                if (choice?.delta) {
+                  if (choice.delta.content) {
+                    accumulatedContent += choice.delta.content
+                  }
+                  if (choice.delta.thinking) {
+                    accumulatedThinking += choice.delta.thinking
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+
           // Mark streaming as complete
+          const finalContent = accumulatedContent
+          const finalThinking = accumulatedThinking
+
           setPanels((prev) =>
             prev.map((p) =>
               p.id === panel.id
@@ -235,8 +270,8 @@ export function usePlayground() {
                       m.id === assistantMsgId
                         ? {
                             ...m,
-                            content: accumulatedContent,
-                            thinking: accumulatedThinking || undefined,
+                            content: finalContent,
+                            thinking: finalThinking || undefined,
                             isStreaming: false,
                           }
                         : m

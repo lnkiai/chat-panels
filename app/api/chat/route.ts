@@ -10,6 +10,8 @@ interface ChatRequestBody {
   enableThinking: boolean
 }
 
+export const runtime = "edge"
+
 export async function POST(req: NextRequest) {
   try {
     const body: ChatRequestBody = await req.json()
@@ -25,7 +27,10 @@ export async function POST(req: NextRequest) {
 
     // Build messages array with system prompt
     const apiMessages = [
-      { role: "system", content: systemPrompt || "You are a helpful assistant." },
+      {
+        role: "system",
+        content: systemPrompt || "You are a helpful assistant.",
+      },
       ...messages,
     ]
 
@@ -54,94 +59,26 @@ export async function POST(req: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      const errorMessage =
-        errorData?.error?.message || `Longcat API error: ${response.status}`
+      const errorText = await response.text()
+      let errorMessage = `Longcat API error: ${response.status}`
+      try {
+        const errorData = JSON.parse(errorText)
+        errorMessage = errorData?.error?.message || errorMessage
+      } catch {
+        // use default
+      }
       return Response.json({ error: errorMessage }, { status: response.status })
     }
 
-    // Stream the response back to the client
-    const reader = response.body?.getReader()
-    if (!reader) {
+    // Passthrough the SSE stream directly from Longcat API
+    if (!response.body) {
       return Response.json(
         { error: "No response body from API" },
         { status: 500 }
       )
     }
 
-    const encoder = new TextEncoder()
-    const decoder = new TextDecoder()
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          let buffer = ""
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-              controller.close()
-              break
-            }
-
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split("\n")
-            // Keep last potentially incomplete line in buffer
-            buffer = lines.pop() || ""
-
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (!trimmed || trimmed === "data: [DONE]") {
-                if (trimmed === "data: [DONE]") {
-                  controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-                }
-                continue
-              }
-
-              if (trimmed.startsWith("data: ")) {
-                const jsonStr = trimmed.slice(6)
-                try {
-                  const parsed = JSON.parse(jsonStr)
-                  const choice = parsed.choices?.[0]
-
-                  if (choice?.delta) {
-                    const delta = choice.delta
-                    const output: Record<string, string> = {}
-
-                    if (delta.content) {
-                      output.content = delta.content
-                    }
-                    if (delta.thinking) {
-                      output.thinking = delta.thinking
-                    }
-
-                    if (Object.keys(output).length > 0) {
-                      controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify(output)}\n\n`)
-                      )
-                    }
-                  }
-                } catch {
-                  // Skip malformed JSON chunks
-                }
-              }
-            }
-          }
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Stream error"
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: message })}\n\n`
-            )
-          )
-          controller.close()
-        }
-      },
-    })
-
-    return new Response(stream, {
+    return new Response(response.body, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
