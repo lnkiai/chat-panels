@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 
 import './globals.css'
+import 'streamdown/styles.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const jetbrainsMono = JetBrains_Mono({

@@ -9,8 +9,8 @@ import {
   Bot,
   Loader2,
 } from "lucide-react"
+import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { PanelState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -54,9 +54,7 @@ export function ChatPanel({
             <ChevronRight className="h-3 w-3 shrink-0" />
           )}
           <Settings2 className="h-3 w-3 shrink-0" />
-          <span className="font-medium">
-            Panel {panelIndex + 1}
-          </span>
+          <span className="font-medium">Panel {panelIndex + 1}</span>
           <span className="text-muted-foreground truncate">
             {isSystemPromptOpen
               ? "System Prompt"
@@ -123,7 +121,11 @@ export function ChatPanel({
                       {message.content}
                     </p>
                   ) : message.content ? (
-                    <MarkdownRenderer content={message.content} />
+                    <div className="text-sm">
+                      <Streamdown isAnimating={!!message.isStreaming}>
+                        {message.content}
+                      </Streamdown>
+                    </div>
                   ) : message.isStreaming ? (
                     <div className="flex items-center gap-1.5">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse" />
