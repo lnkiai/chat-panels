@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -28,17 +28,12 @@ export function ChatPanel({
   onUpdateSystemPrompt,
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [panel.messages])
 
   return (
     <div
       className={cn(
         "flex flex-col h-full min-w-0",
-        panelIndex < totalPanels - 1 && "border-r"
+        panelIndex < totalPanels - 1 && "md:border-r"
       )}
     >
       {/* Panel header with system prompt */}
@@ -75,12 +70,12 @@ export function ChatPanel({
         )}
       </div>
 
-      {/* Messages area */}
+      {/* Messages area - fixed height with internal scroll, NO auto-scroll */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-muted-foreground">
-              メッセージを入力して送信してください
+              {"メッセージを入力して送信してください"}
             </p>
           </div>
         ) : (
@@ -109,9 +104,12 @@ export function ChatPanel({
                   )}
                 </div>
 
-                {/* Thinking process (collapsible) */}
-                {message.thinking && (
-                  <ThinkingBlock thinking={message.thinking} />
+                {/* Thinking process - shown during streaming and after completion */}
+                {message.thinking && message.thinking.length > 0 && (
+                  <ThinkingBlock
+                    thinking={message.thinking}
+                    isStreaming={!!message.isStreaming}
+                  />
                 )}
 
                 {/* Message content */}
@@ -127,7 +125,7 @@ export function ChatPanel({
                       </Streamdown>
                     </div>
                   ) : message.isStreaming ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 pl-0">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse" />
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:150ms]" />
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:300ms]" />
@@ -136,7 +134,6 @@ export function ChatPanel({
                 </div>
               </div>
             ))}
-            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
@@ -144,8 +141,14 @@ export function ChatPanel({
   )
 }
 
-function ThinkingBlock({ thinking }: { thinking: string }) {
-  const [isOpen, setIsOpen] = useState(false)
+function ThinkingBlock({
+  thinking,
+  isStreaming,
+}: {
+  thinking: string
+  isStreaming: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(true)
 
   return (
     <div className="pl-7 mb-2">
@@ -159,11 +162,14 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
         ) : (
           <ChevronRight className="h-3 w-3" />
         )}
-        <span className="font-medium">Thinking Process</span>
+        <span className="font-medium">
+          {"Thinking Process"}
+          {isStreaming && " ..."}
+        </span>
       </button>
       {isOpen && (
-        <div className="mt-1.5 p-2.5 bg-muted/50 border rounded-sm text-xs text-muted-foreground font-mono leading-relaxed whitespace-pre-wrap overflow-x-auto">
-          {thinking}
+        <div className="mt-1.5 p-2.5 bg-muted/50 border rounded-sm text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto">
+          <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
         </div>
       )}
     </div>

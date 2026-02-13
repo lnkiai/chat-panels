@@ -287,7 +287,7 @@ export function HeaderBar({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground mr-1">Panels</span>
-                {[1, 2, 3].map((count) => (
+                {[1, 2, 3, 4, 5].map((count) => (
                   <button
                     key={count}
                     onClick={() => onUpdatePanelCount(count)}

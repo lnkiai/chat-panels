@@ -68,12 +68,22 @@ async function* parseSSEStream(
         if (delta) {
           const content =
             typeof delta.content === "string" ? delta.content : ""
+          // Check multiple possible field names for thinking
           const thinking =
-            typeof delta.thinking === "string" ? delta.thinking : ""
+            typeof delta.thinking === "string"
+              ? delta.thinking
+              : typeof delta.reasoning_content === "string"
+                ? delta.reasoning_content
+                : typeof delta.reasoning === "string"
+                  ? delta.reasoning
+                  : ""
 
           if (content || thinking) {
             yield { content, thinking }
           }
+        } else {
+          // Log the full chunk for debugging if delta is missing
+          console.log("[v0] SSE chunk without delta:", JSON.stringify(parsed).slice(0, 200))
         }
       } catch {
         // Malformed JSON chunk - skip
@@ -94,7 +104,13 @@ async function* parseSSEStream(
           const content =
             typeof delta.content === "string" ? delta.content : ""
           const thinking =
-            typeof delta.thinking === "string" ? delta.thinking : ""
+            typeof delta.thinking === "string"
+              ? delta.thinking
+              : typeof delta.reasoning_content === "string"
+                ? delta.reasoning_content
+                : typeof delta.reasoning === "string"
+                  ? delta.reasoning
+                  : ""
           if (content || thinking) {
             yield { content, thinking }
           }
@@ -123,6 +139,10 @@ export function usePlayground() {
   ])
 
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map())
+
+  // Keep a ref to settings so sendMessage always reads the latest
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
   const updatePanelCount = useCallback((count: number) => {
     setSettings((prev) => ({ ...prev, panelCount: count }))
@@ -161,7 +181,8 @@ export function usePlayground() {
 
   const sendMessage = useCallback(
     async (userMessage: string) => {
-      if (!userMessage.trim() || !settings.apiKey.trim()) return
+      const snap = settingsRef.current
+      if (!userMessage.trim() || !snap.apiKey.trim()) return
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -170,7 +191,7 @@ export function usePlayground() {
       }
 
       // Snapshot settings for the closure
-      const currentSettings = { ...settings }
+      const currentSettings = { ...snap }
 
       // Snapshot panels for building API payloads (use the raw state)
       let currentPanelSnapshots: PanelState[] = []
@@ -357,7 +378,8 @@ export function usePlayground() {
 
       await Promise.allSettled(promises)
     },
-    [panels, settings]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
 
   return {
