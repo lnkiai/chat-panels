@@ -102,10 +102,9 @@ export function ChatPanel({
             </button>
           )}
 
-          {!isSystemPromptOpen && (
-            <span className="ml-auto text-[10px] text-muted-foreground/50 truncate max-w-[80px]">
-              {panel.systemPrompt.slice(0, 16)}
-              {"..."}
+          {!isSystemPromptOpen && panel.systemPrompt.trim() && (
+            <span className="ml-auto text-[10px] text-muted-foreground/40 truncate min-w-0 flex-1 text-right pl-3">
+              {panel.systemPrompt}
             </span>
           )}
         </div>
