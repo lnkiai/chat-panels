@@ -7,26 +7,18 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import type { PlaygroundSettings, ModelId } from "@/lib/types"
-import { MODELS, isThinkingModel } from "@/lib/types"
+import type { PlaygroundSettings } from "@/lib/types"
+import { isThinkingModel } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface HeaderBarProps {
   settings: PlaygroundSettings
   onUpdateApiKey: (key: string) => void
-  onUpdateModel: (model: ModelId) => void
   onUpdatePanelCount: (count: number) => void
   onToggleThinking: (enabled: boolean) => void
   onClearAll: () => void
@@ -35,7 +27,6 @@ interface HeaderBarProps {
 export function HeaderBar({
   settings,
   onUpdateApiKey,
-  onUpdateModel,
   onUpdatePanelCount,
   onToggleThinking,
   onClearAll,
@@ -72,8 +63,8 @@ export function HeaderBar({
                   type={showApiKey ? "text" : "password"}
                   value={settings.apiKey}
                   onChange={(e) => onUpdateApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="h-7 w-36 pr-7 text-xs font-mono bg-background"
+                  placeholder="ak-..."
+                  className="h-7 w-40 pr-7 text-xs font-mono bg-background"
                 />
                 <button
                   type="button"
@@ -89,30 +80,6 @@ export function HeaderBar({
                 </button>
               </div>
             </div>
-
-            <div className="h-4 w-px bg-border" />
-
-            {/* Model Selector */}
-            <Select
-              value={settings.model}
-              onValueChange={(v) => onUpdateModel(v as ModelId)}
-            >
-              <SelectTrigger className="h-7 w-48 text-xs bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MODELS.map((m) => (
-                  <SelectItem key={m.id} value={m.id} className="text-xs">
-                    <div className="flex flex-col">
-                      <span>{m.label}</span>
-                      <span className="text-muted-foreground text-[10px]">
-                        {m.description}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <div className="h-4 w-px bg-border" />
 
@@ -240,7 +207,7 @@ export function HeaderBar({
                   type={showApiKey ? "text" : "password"}
                   value={settings.apiKey}
                   onChange={(e) => onUpdateApiKey(e.target.value)}
-                  placeholder="sk-..."
+                  placeholder="ak-..."
                   className="h-8 pr-8 text-xs font-mono bg-background"
                 />
                 <button
@@ -256,31 +223,6 @@ export function HeaderBar({
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Model */}
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Model</Label>
-              <Select
-                value={settings.model}
-                onValueChange={(v) => onUpdateModel(v as ModelId)}
-              >
-                <SelectTrigger className="h-8 w-full text-xs bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      <div className="flex flex-col">
-                        <span>{m.label}</span>
-                        <span className="text-muted-foreground text-[10px]">
-                          {m.description}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Panels + Thinking row */}

@@ -13,6 +13,7 @@ export interface ChatMessage {
 
 export interface PanelState {
   id: number
+  title: string
   systemPrompt: string
   messages: ChatMessage[]
   isLoading: boolean

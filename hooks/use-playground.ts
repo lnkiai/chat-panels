@@ -13,6 +13,7 @@ const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 function createPanel(id: number): PanelState {
   return {
     id,
+    title: `Panel ${id + 1}`,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     messages: [],
     isLoading: false,
@@ -81,13 +82,9 @@ async function* parseSSEStream(
           if (content || thinking) {
             yield { content, thinking }
           }
-        } else {
-          // Log the full chunk for debugging if delta is missing
-          console.log("[v0] SSE chunk without delta:", JSON.stringify(parsed).slice(0, 200))
         }
       } catch {
         // Malformed JSON chunk - skip
-        console.log("[v0] Skipped malformed SSE JSON:", jsonStr.slice(0, 100))
       }
     }
   }
@@ -159,6 +156,17 @@ export function usePlayground() {
   const toggleThinking = useCallback((enabled: boolean) => {
     setSettings((prev) => ({ ...prev, enableThinking: enabled }))
   }, [])
+
+  const updatePanelTitle = useCallback(
+    (panelId: number, title: string) => {
+      setPanels((prev) =>
+        prev.map((p) =>
+          p.id === panelId ? { ...p, title } : p
+        )
+      )
+    },
+    []
+  )
 
   const updateSystemPrompt = useCallback(
     (panelId: number, prompt: string) => {
@@ -243,13 +251,6 @@ export function usePlayground() {
             { role: "user" as const, content: userMessage },
           ]
 
-          console.log(
-            "[v0] Sending request for panel",
-            panelId,
-            "model:",
-            currentSettings.model
-          )
-
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -277,8 +278,6 @@ export function usePlayground() {
 
           const reader = response.body?.getReader()
           if (!reader) throw new Error("No response body")
-
-          console.log("[v0] Stream started for panel", panelId)
 
           let accContent = ""
           let accThinking = ""
@@ -312,15 +311,6 @@ export function usePlayground() {
             )
           }
 
-          console.log(
-            "[v0] Stream complete for panel",
-            panelId,
-            "- content length:",
-            accContent.length,
-            "thinking length:",
-            accThinking.length
-          )
-
           // Mark streaming as done
           const finalContent = accContent
           const finalThinking = accThinking
@@ -350,7 +340,6 @@ export function usePlayground() {
 
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error"
-          console.log("[v0] Stream error for panel", panelId, ":", errorMessage)
 
           setPanels((prev) =>
             prev.map((p) =>
@@ -389,6 +378,7 @@ export function usePlayground() {
     updateModel,
     updatePanelCount,
     toggleThinking,
+    updatePanelTitle,
     updateSystemPrompt,
     clearAllChats,
     sendMessage,

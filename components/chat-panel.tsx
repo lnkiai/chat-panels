@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -8,6 +8,7 @@ import {
   User,
   Bot,
   Loader2,
+  Pencil,
 } from "lucide-react"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,6 +20,7 @@ interface ChatPanelProps {
   panelIndex: number
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
+  onUpdateTitle: (title: string) => void
 }
 
 export function ChatPanel({
@@ -26,36 +28,87 @@ export function ChatPanel({
   panelIndex,
   totalPanels,
   onUpdateSystemPrompt,
+  onUpdateTitle,
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(panel.title)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
+
+  const commitTitle = () => {
+    const trimmed = titleDraft.trim()
+    if (trimmed) {
+      onUpdateTitle(trimmed)
+    } else {
+      setTitleDraft(panel.title)
+    }
+    setIsEditingTitle(false)
+  }
 
   return (
-    <div
-      className={cn(
-        "flex flex-col h-full min-w-0",
-        panelIndex < totalPanels - 1 && "md:border-r"
-      )}
-    >
-      {/* Panel header with system prompt */}
+    <div className="flex flex-col h-full min-w-0">
+      {/* Panel header with title + system prompt toggle */}
       <div className="border-b shrink-0">
-        <button
-          onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
-          className="flex items-center gap-2 w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          aria-expanded={isSystemPromptOpen}
-        >
-          {isSystemPromptOpen ? (
-            <ChevronDown className="h-3 w-3 shrink-0" />
+        <div className="flex items-center w-full px-3 py-2">
+          {/* Collapsible toggle */}
+          <button
+            onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            aria-expanded={isSystemPromptOpen}
+          >
+            {isSystemPromptOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            <Settings2 className="h-3 w-3" />
+          </button>
+
+          {/* Editable title */}
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitTitle()
+                if (e.key === "Escape") {
+                  setTitleDraft(panel.title)
+                  setIsEditingTitle(false)
+                }
+              }}
+              className="ml-2 text-xs font-medium bg-transparent border-b border-foreground outline-none px-0 py-0 w-24"
+              maxLength={30}
+            />
           ) : (
-            <ChevronRight className="h-3 w-3 shrink-0" />
+            <button
+              onClick={() => {
+                setTitleDraft(panel.title)
+                setIsEditingTitle(true)
+              }}
+              className="ml-2 flex items-center gap-1 text-xs font-medium text-foreground hover:text-muted-foreground transition-colors group"
+            >
+              <span>{panel.title}</span>
+              <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+            </button>
           )}
-          <Settings2 className="h-3 w-3 shrink-0" />
-          <span className="font-medium">Panel {panelIndex + 1}</span>
-          <span className="text-muted-foreground truncate">
-            {isSystemPromptOpen
-              ? "System Prompt"
-              : `- ${panel.systemPrompt.slice(0, 50)}${panel.systemPrompt.length > 50 ? "..." : ""}`}
-          </span>
-        </button>
+
+          {/* System prompt preview when collapsed */}
+          {!isSystemPromptOpen && (
+            <span className="ml-2 text-[10px] text-muted-foreground truncate">
+              {panel.systemPrompt.slice(0, 40)}
+              {panel.systemPrompt.length > 40 ? "..." : ""}
+            </span>
+          )}
+        </div>
 
         {isSystemPromptOpen && (
           <div className="px-3 pb-3">
@@ -70,7 +123,7 @@ export function ChatPanel({
         )}
       </div>
 
-      {/* Messages area - fixed height with internal scroll, NO auto-scroll */}
+      {/* Messages area - fixed height with internal scroll */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -104,7 +157,7 @@ export function ChatPanel({
                   )}
                 </div>
 
-                {/* Thinking process - shown during streaming and after completion */}
+                {/* Thinking process */}
                 {message.thinking && message.thinking.length > 0 && (
                   <ThinkingBlock
                     thinking={message.thinking}
@@ -125,7 +178,7 @@ export function ChatPanel({
                       </Streamdown>
                     </div>
                   ) : message.isStreaming ? (
-                    <div className="flex items-center gap-1.5 pl-0">
+                    <div className="flex items-center gap-1.5">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse" />
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:150ms]" />
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:300ms]" />
