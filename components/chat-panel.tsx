@@ -122,7 +122,7 @@ export function ChatPanel({
               transition={{ type: "spring", stiffness: 300, damping: 28 }}
               className="overflow-hidden"
             >
-              <div className="px-3.5 pt-2 pb-3">
+              <div className="px-3.5 pt-2 pb-3 flex flex-col gap-1.5">
                 <Textarea
                   value={panel.systemPrompt}
                   onChange={(e) => onUpdateSystemPrompt(e.target.value)}
@@ -130,6 +130,7 @@ export function ChatPanel({
                   placeholder="System prompt..."
                   rows={3}
                 />
+                <PromptStatsBar content={panel.systemPrompt} />
               </div>
             </motion.div>
           )}
@@ -214,10 +215,7 @@ function GlassOverlay({
           transition={{ type: "spring", stiffness: 380, damping: 22 }}
           className="absolute bottom-0 left-0 right-0 z-10"
         >
-          <div
-            className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 backdrop-blur-xl"
-            style={{ backgroundColor: "hsl(var(--card) / 0.65)" }}
-          >
+          <div className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-white/90">
             <button
               onClick={handleCopy}
               className={cn(
@@ -374,6 +372,66 @@ function AssistantMessage({
         onClose={close}
       />
     </motion.div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Thinking block                                                     */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  System prompt stats bar                                            */
+/* ------------------------------------------------------------------ */
+
+function PromptStatsBar({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false)
+  const charCount = content.length
+  const tokenEstimate = Math.ceil(charCount / 3)
+
+  const handleCopy = useCallback(() => {
+    if (!content.trim()) return
+    navigator.clipboard.writeText(content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [content])
+
+  return (
+    <div className="flex items-center gap-2 px-1 py-0.5">
+      <button
+        onClick={handleCopy}
+        className={cn(
+          "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
+          copied
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        {copied ? (
+          <>
+            <Check className="h-2.5 w-2.5" />
+            <span>{"Copied"}</span>
+          </>
+        ) : (
+          <>
+            <Copy className="h-2.5 w-2.5" />
+            <span>{"Copy"}</span>
+          </>
+        )}
+      </button>
+
+      <div className="h-3 w-px bg-border/40" />
+
+      <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/50">
+        <span className="flex items-center gap-0.5">
+          <Type className="h-2.5 w-2.5" />
+          {charCount.toLocaleString()} {"chars"}
+        </span>
+        <span>
+          {"~"}
+          {tokenEstimate.toLocaleString()} {"tokens"}
+        </span>
+      </div>
+    </div>
   )
 }
 
