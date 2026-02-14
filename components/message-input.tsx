@@ -59,7 +59,7 @@ export function MessageInput({
   const currentModel = MODELS.find((m) => m.id === model)
 
   return (
-    <footer className="bg-transparent">
+    <footer className="bg-transparent border-none">
       <div className="px-4 pt-2 pb-4 max-w-3xl mx-auto">
         {/* Capsule input container */}
         <div className="bg-card border-2 border-border rounded-[28px] focus-within:border-primary/40 transition-all shadow-[0_2px_12px_rgba(62,168,255,0.06)]">

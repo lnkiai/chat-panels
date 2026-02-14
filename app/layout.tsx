@@ -1,10 +1,24 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
+import { JetBrains_Mono } from 'next/font/google'
 
 import './globals.css'
 import 'streamdown/styles.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const lineSeedRegular = localFont({
+  src: '../public/fonts/LINESeedJP-Regular.ttf',
+  weight: '400',
+  variable: '--font-lineseed',
+  display: 'swap',
+})
+
+const lineSeedBold = localFont({
+  src: '../public/fonts/LINESeedJP-Bold.ttf',
+  weight: '700',
+  variable: '--font-lineseed-bold',
+  display: 'swap',
+})
+
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains-mono',
@@ -32,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${lineSeedRegular.variable} ${lineSeedBold.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         {children}
       </body>
