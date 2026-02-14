@@ -7,8 +7,6 @@ import {
   Settings,
   X,
   Trash2,
-  KeyRound,
-  RotateCcw,
   Ellipsis,
 } from "lucide-react"
 import Image from "next/image"
@@ -43,24 +41,9 @@ interface HeaderBarProps {
 /* ------------------------------------------------------------------ */
 
 const MANAGE_TABS = [
-  {
-    id: "chats",
-    label: "会話",
-    icon: Trash2,
-    description: "会話履歴を削除",
-  },
-  {
-    id: "apikey",
-    label: "API Key",
-    icon: KeyRound,
-    description: "API Keyを削除",
-  },
-  {
-    id: "all",
-    label: "すべて",
-    icon: RotateCcw,
-    description: "すべてリセット",
-  },
+  { id: "chats", label: "会話", description: "会話履歴を削除" },
+  { id: "apikey", label: "API Key", description: "API Keyを削除" },
+  { id: "all", label: "すべて", description: "すべてリセット" },
 ] as const
 
 type ManageTabId = (typeof MANAGE_TABS)[number]["id"]
@@ -142,7 +125,6 @@ function ManageMenu({
               {/* Icon tab selector */}
               <div className="flex rounded-xl border border-border/50 bg-background/60 p-1 mb-2">
                 {MANAGE_TABS.map((tab) => {
-                  const Icon = tab.icon
                   const isActive = selected === tab.id
                   return (
                     <button
@@ -166,16 +148,13 @@ function ManageMenu({
                       )}
                       <span
                         className={cn(
-                          "relative z-10 flex items-center gap-1.5 transition-colors",
+                          "relative z-10 text-[11px] font-medium transition-colors",
                           isActive
                             ? "text-foreground"
                             : "text-muted-foreground"
                         )}
                       >
-                        <Icon className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-medium">
-                          {tab.label}
-                        </span>
+                        {tab.label}
                       </span>
                     </button>
                   )
