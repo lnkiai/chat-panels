@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   ChevronRight,
   Settings2,
@@ -8,6 +8,8 @@ import {
   Bot,
   Loader2,
   Pencil,
+  Copy,
+  Check,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
@@ -139,7 +141,7 @@ export function ChatPanel({
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto min-h-0 bg-background/40">
+      <div className="flex-1 overflow-y-auto min-h-0 bg-background/40 custom-scrollbar">
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-muted-foreground/60">
@@ -147,90 +149,13 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="p-3 space-y-3">
+          <div className="px-3 py-4 space-y-4">
             {panel.messages.map((message, i) => (
-              <motion.div
+              <MessageBubble
                 key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 260,
-                  damping: 24,
-                  delay: i === panel.messages.length - 1 ? 0 : 0,
-                }}
-                className={cn(
-                  "rounded-2xl px-3.5 py-3",
-                  message.role === "user"
-                    ? "bg-primary/5 border border-primary/10"
-                    : "bg-card border border-border/40"
-                )}
-              >
-                {/* Message header */}
-                <div className="flex items-center gap-2 mb-2">
-                  {message.role === "user" ? (
-                    <>
-                      <div className="flex items-center justify-center h-5 w-5 rounded-lg bg-primary/10 border border-primary/20">
-                        <User className="h-3 w-3 text-primary" />
-                      </div>
-                      <span className="text-xs font-heading text-foreground">
-                        You
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-center h-5 w-5 rounded-lg bg-primary text-primary-foreground">
-                        <Bot className="h-3 w-3" />
-                      </div>
-                      <span className="text-xs font-heading text-foreground">
-                        Assistant
-                      </span>
-                      {message.isStreaming && (
-                        <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Thinking process */}
-                {message.thinking && message.thinking.length > 0 && (
-                  <ThinkingBlock
-                    thinking={message.thinking}
-                    isStreaming={!!message.isStreaming}
-                  />
-                )}
-
-                {/* Message content */}
-                <div className="pl-7">
-                  {message.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.content}
-                    </p>
-                  ) : message.content ? (
-                    <div className="text-sm">
-                      <Streamdown isAnimating={!!message.isStreaming}>
-                        {message.content}
-                      </Streamdown>
-                    </div>
-                  ) : message.isStreaming ? (
-                    <div className="flex items-center gap-1.5 py-1">
-                      {[0, 1, 2].map((dot) => (
-                        <motion.span
-                          key={dot}
-                          className="inline-block h-1.5 w-1.5 rounded-full bg-primary"
-                          animate={{ y: [0, -4, 0] }}
-                          transition={{
-                            duration: 0.6,
-                            repeat: Infinity,
-                            delay: dot * 0.15,
-                            ease: "easeInOut",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </motion.div>
+                message={message}
+                isLast={i === panel.messages.length - 1}
+              />
             ))}
           </div>
         )}
@@ -239,6 +164,163 @@ export function ChatPanel({
   )
 }
 
+/* ------------------------------------------------------------------ */
+/* Message bubble - reference design:                                  */
+/*   User: right-aligned, rounded with cut top-right corner, white bg */
+/*   AI: full-width, no wrapper card, content + action bar            */
+/* ------------------------------------------------------------------ */
+
+function MessageBubble({
+  message,
+  isLast,
+}: {
+  message: PanelState["messages"][number]
+  isLast: boolean
+}) {
+  const isUser = message.role === "user"
+
+  if (isUser) {
+    return <UserBubble content={message.content} />
+  }
+
+  return (
+    <AssistantMessage
+      message={message}
+      isLast={isLast}
+    />
+  )
+}
+
+/* --- User bubble --- */
+function UserBubble({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [content])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 26 }}
+      className="flex justify-end group"
+    >
+      {/* Hover copy button on the left */}
+      <button
+        onClick={handleCopy}
+        className="self-center mr-2 h-7 w-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all text-muted-foreground hover:text-foreground hover:bg-muted/60"
+        title={copied ? "Copied" : "Copy"}
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+
+      <div className="max-w-[80%] px-4 py-3 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5">
+        <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">
+          {content}
+        </p>
+      </div>
+    </motion.div>
+  )
+}
+
+/* --- Assistant message --- */
+function AssistantMessage({
+  message,
+  isLast,
+}: {
+  message: PanelState["messages"][number]
+  isLast: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [message.content])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 26 }}
+      className="w-full"
+    >
+      {/* Header: icon + label */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center justify-center h-6 w-6 rounded-lg bg-primary text-primary-foreground">
+          <Bot className="h-3.5 w-3.5" />
+        </div>
+        <span className="text-xs font-heading text-foreground">Assistant</span>
+        {message.isStreaming && (
+          <Loader2 className="h-3 w-3 animate-spin text-primary" />
+        )}
+      </div>
+
+      {/* Thinking process */}
+      {message.thinking && message.thinking.length > 0 && (
+        <ThinkingBlock
+          thinking={message.thinking}
+          isStreaming={!!message.isStreaming}
+        />
+      )}
+
+      {/* Content */}
+      <div className="pl-8">
+        {message.content ? (
+          <div className="text-sm leading-relaxed">
+            <Streamdown isAnimating={!!message.isStreaming}>
+              {message.content}
+            </Streamdown>
+          </div>
+        ) : message.isStreaming ? (
+          <div className="flex items-center gap-1.5 py-1">
+            {[0, 1, 2].map((dot) => (
+              <motion.span
+                key={dot}
+                className="inline-block h-1.5 w-1.5 rounded-full bg-primary"
+                animate={{ y: [0, -4, 0] }}
+                transition={{
+                  duration: 0.6,
+                  repeat: Infinity,
+                  delay: dot * 0.15,
+                  ease: "easeInOut",
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {/* Action bar - only after streaming complete */}
+        {!message.isStreaming && message.content.trim() !== "" && (
+          <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-border/30">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 h-7 px-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all text-xs"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3" />
+                  <span>{"コピー済み"}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" />
+                  <span>{"コピー"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+/* --- Thinking block --- */
 function ThinkingBlock({
   thinking,
   isStreaming,
@@ -249,7 +331,7 @@ function ThinkingBlock({
   const [isOpen, setIsOpen] = useState(true)
 
   return (
-    <div className="pl-7 mb-2">
+    <div className="pl-8 mb-2">
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         whileHover={{ scale: 1.02 }}
@@ -277,7 +359,7 @@ function ThinkingBlock({
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="overflow-hidden"
           >
-            <div className="mt-1.5 p-3 bg-primary/5 border border-primary/10 rounded-xl text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto">
+            <div className="mt-1.5 p-3 bg-primary/5 border border-primary/10 rounded-xl text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
               <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
             </div>
           </motion.div>
