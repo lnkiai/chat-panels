@@ -29,7 +29,7 @@ export function ChatPanel({
   onUpdateSystemPrompt,
   onUpdateTitle,
 }: ChatPanelProps) {
-  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(true)
+  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(panel.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -438,6 +438,15 @@ function ThinkingBlock({
   isStreaming: boolean
 }) {
   const [isOpen, setIsOpen] = useState(true)
+  const wasStreamingRef = useRef(isStreaming)
+
+  useEffect(() => {
+    // When streaming stops (was true -> now false), auto-collapse
+    if (wasStreamingRef.current && !isStreaming) {
+      setIsOpen(false)
+    }
+    wasStreamingRef.current = isStreaming
+  }, [isStreaming])
 
   return (
     <div className="mb-2">
