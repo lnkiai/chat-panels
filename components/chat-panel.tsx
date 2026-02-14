@@ -122,13 +122,13 @@ export function ChatPanel({
               transition={{ type: "spring", stiffness: 300, damping: 28 }}
               className="overflow-hidden"
             >
-              <div className="px-3.5 pb-3">
+              <div className="px-3.5 pt-2 pb-3">
                 <Textarea
                   value={panel.systemPrompt}
                   onChange={(e) => onUpdateSystemPrompt(e.target.value)}
-                  className="text-xs min-h-[56px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40"
+                  className="text-xs min-h-[80px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
                   placeholder="System prompt..."
-                  rows={2}
+                  rows={3}
                 />
               </div>
             </motion.div>
