@@ -9,6 +9,9 @@ export default function PlaygroundPage() {
   const {
     settings,
     panels,
+    draft,
+    setDraft,
+    hydrated,
     updateApiKey,
     updateModel,
     updatePanelCount,
@@ -16,11 +19,23 @@ export default function PlaygroundPage() {
     updatePanelTitle,
     updateSystemPrompt,
     clearAllChats,
+    clearApiKey,
+    resetSystemPrompts,
+    clearEverything,
     sendMessage,
   } = usePlayground()
 
   const isAnyPanelLoading = panels.some((p) => p.isLoading)
   const count = settings.panelCount
+
+  // Avoid hydration mismatch - show nothing until localStorage is loaded
+  if (!hydrated) {
+    return (
+      <div className="flex items-center justify-center h-dvh bg-background">
+        <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-dvh bg-background">
@@ -30,12 +45,15 @@ export default function PlaygroundPage() {
         onUpdateApiKey={updateApiKey}
         onUpdatePanelCount={updatePanelCount}
         onToggleThinking={toggleThinking}
-        onClearAll={clearAllChats}
+        onClearChats={clearAllChats}
+        onClearApiKey={clearApiKey}
+        onResetPrompts={resetSystemPrompts}
+        onClearEverything={clearEverything}
       />
 
       {/* Main Chat Grid */}
       <main className="flex-1 min-h-0 overflow-hidden p-3 md:p-4 pt-2 md:pt-3">
-        {/* Mobile: vertical stack with gap */}
+        {/* Mobile: vertical stack */}
         <div className="flex flex-col md:hidden h-full gap-3">
           {panels.map((panel, idx) => (
             <div
@@ -60,7 +78,7 @@ export default function PlaygroundPage() {
           ))}
         </div>
 
-        {/* Desktop: smart grid with gap */}
+        {/* Desktop: smart grid */}
         <div className="hidden md:block h-full">
           {count <= 3 ? (
             <div className="flex h-full gap-4">
@@ -108,7 +126,6 @@ export default function PlaygroundPage() {
             </div>
           ) : (
             <div className="flex flex-col h-full gap-4">
-              {/* Top row: 3 panels */}
               <div className="flex flex-1 min-h-0 gap-4">
                 {panels.slice(0, 3).map((panel, idx) => (
                   <div
@@ -134,7 +151,6 @@ export default function PlaygroundPage() {
                   </div>
                 ))}
               </div>
-              {/* Bottom row: 2 panels */}
               <div className="flex flex-1 min-h-0 gap-4">
                 {panels.slice(3, 5).map((panel, idx) => (
                   <div
@@ -165,13 +181,15 @@ export default function PlaygroundPage() {
         </div>
       </main>
 
-      {/* Global Input - transparent background */}
+      {/* Global Input */}
       <MessageInput
         onSend={sendMessage}
         disabled={!settings.apiKey.trim()}
         isAnyPanelLoading={isAnyPanelLoading}
         model={settings.model}
         onUpdateModel={updateModel}
+        draft={draft}
+        setDraft={setDraft}
       />
     </div>
   )

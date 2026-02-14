@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import type {
   PlaygroundSettings,
   PanelState,
@@ -9,6 +9,13 @@ import type {
 } from "@/lib/types"
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
+const STORAGE_KEY_SETTINGS = "longcat-settings"
+const STORAGE_KEY_PANELS = "longcat-panels"
+const STORAGE_KEY_DRAFT = "longcat-draft"
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
 
 function createPanel(id: number): PanelState {
   return {
@@ -24,10 +31,43 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-/**
- * Parse a raw SSE stream from a ReadableStream<Uint8Array>.
- * Yields { content, thinking } deltas as they arrive.
- */
+/* ------------------------------------------------------------------ */
+/*  localStorage helpers                                               */
+/* ------------------------------------------------------------------ */
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+function saveToStorage(key: string, value: unknown) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // quota exceeded - silently fail
+  }
+}
+
+function removeFromStorage(key: string) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // ignore
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  SSE parser                                                         */
+/* ------------------------------------------------------------------ */
+
 async function* parseSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>
 ): AsyncGenerator<{ content: string; thinking: string }> {
@@ -39,24 +79,13 @@ async function* parseSSEStream(
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-
-    // SSE protocol: events are separated by double newlines
-    // But we need to handle data lines that end with single newlines too
-    // Split on newlines and process complete lines
     const lines = buffer.split("\n")
-    // Keep the last potentially incomplete line in the buffer
     buffer = lines.pop() || ""
 
     for (const rawLine of lines) {
       const line = rawLine.trim()
-
-      // Skip empty lines (SSE event separators)
       if (!line) continue
-
-      // End of stream signal
       if (line === "data: [DONE]") continue
-
-      // Only process data lines
       if (!line.startsWith("data:")) continue
 
       const jsonStr = line.slice(5).trim()
@@ -69,7 +98,6 @@ async function* parseSSEStream(
         if (delta) {
           const content =
             typeof delta.content === "string" ? delta.content : ""
-          // Check multiple possible field names for thinking
           const thinking =
             typeof delta.thinking === "string"
               ? delta.thinking
@@ -84,12 +112,11 @@ async function* parseSSEStream(
           }
         }
       } catch {
-        // Malformed JSON chunk - skip
+        // skip
       }
     }
   }
 
-  // Process any remaining buffer
   if (buffer.trim()) {
     const line = buffer.trim()
     if (line.startsWith("data:") && line !== "data: [DONE]") {
@@ -119,27 +146,95 @@ async function* parseSSEStream(
   }
 }
 
-export function usePlayground() {
-  const [settings, setSettings] = useState<PlaygroundSettings>({
-    apiKey: "",
-    model: "LongCat-Flash-Lite",
-    panelCount: 2,
-    enableThinking: false,
-  })
+/* ------------------------------------------------------------------ */
+/*  Default values                                                     */
+/* ------------------------------------------------------------------ */
 
-  const [panels, setPanels] = useState<PanelState[]>([
-    createPanel(0),
-    createPanel(1),
-    createPanel(2),
-    createPanel(3),
-    createPanel(4),
-  ])
+const DEFAULT_SETTINGS: PlaygroundSettings = {
+  apiKey: "",
+  model: "LongCat-Flash-Lite",
+  panelCount: 2,
+  enableThinking: false,
+}
+
+const DEFAULT_PANELS: PanelState[] = [
+  createPanel(0),
+  createPanel(1),
+  createPanel(2),
+  createPanel(3),
+  createPanel(4),
+]
+
+/* ------------------------------------------------------------------ */
+/*  Hook                                                               */
+/* ------------------------------------------------------------------ */
+
+export function usePlayground() {
+  // ------ hydration-safe state init from localStorage ------
+  const [settings, setSettings] = useState<PlaygroundSettings>(DEFAULT_SETTINGS)
+  const [panels, setPanels] = useState<PanelState[]>(DEFAULT_PANELS)
+  const [draft, setDraft] = useState("")
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => {
+    const savedSettings = loadFromStorage<PlaygroundSettings>(
+      STORAGE_KEY_SETTINGS,
+      DEFAULT_SETTINGS
+    )
+    const savedPanels = loadFromStorage<PanelState[]>(
+      STORAGE_KEY_PANELS,
+      DEFAULT_PANELS
+    )
+    const savedDraft = loadFromStorage<string>(STORAGE_KEY_DRAFT, "")
+
+    // Ensure 5 panels always exist (merge saved with defaults)
+    const mergedPanels = Array.from({ length: 5 }, (_, i) => {
+      const saved = savedPanels.find((p) => p.id === i)
+      if (saved) {
+        // Clear isLoading and isStreaming on restore
+        return {
+          ...saved,
+          isLoading: false,
+          messages: saved.messages.map((m) => ({ ...m, isStreaming: false })),
+        }
+      }
+      return createPanel(i)
+    })
+
+    setSettings(savedSettings)
+    setPanels(mergedPanels)
+    setDraft(savedDraft)
+    setHydrated(true)
+  }, [])
+
+  // ------ Persist to localStorage on change ------
+  useEffect(() => {
+    if (!hydrated) return
+    saveToStorage(STORAGE_KEY_SETTINGS, settings)
+  }, [settings, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+    // Save panels without isLoading/isStreaming state
+    const toSave = panels.map((p) => ({
+      ...p,
+      isLoading: false,
+      messages: p.messages.map((m) => ({ ...m, isStreaming: false })),
+    }))
+    saveToStorage(STORAGE_KEY_PANELS, toSave)
+  }, [panels, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+    saveToStorage(STORAGE_KEY_DRAFT, draft)
+  }, [draft, hydrated])
 
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map())
 
-  // Keep a ref to settings so sendMessage always reads the latest
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+
+  /* ------ Settings updates ------ */
 
   const updatePanelCount = useCallback((count: number) => {
     setSettings((prev) => ({ ...prev, panelCount: count }))
@@ -160,9 +255,7 @@ export function usePlayground() {
   const updatePanelTitle = useCallback(
     (panelId: number, title: string) => {
       setPanels((prev) =>
-        prev.map((p) =>
-          p.id === panelId ? { ...p, title } : p
-        )
+        prev.map((p) => (p.id === panelId ? { ...p, title } : p))
       )
     },
     []
@@ -171,13 +264,13 @@ export function usePlayground() {
   const updateSystemPrompt = useCallback(
     (panelId: number, prompt: string) => {
       setPanels((prev) =>
-        prev.map((p) =>
-          p.id === panelId ? { ...p, systemPrompt: prompt } : p
-        )
+        prev.map((p) => (p.id === panelId ? { ...p, systemPrompt: prompt } : p))
       )
     },
     []
   )
+
+  /* ------ Delete operations ------ */
 
   const clearAllChats = useCallback(() => {
     abortControllersRef.current.forEach((controller) => controller.abort())
@@ -186,6 +279,33 @@ export function usePlayground() {
       prev.map((p) => ({ ...p, messages: [], isLoading: false }))
     )
   }, [])
+
+  const clearApiKey = useCallback(() => {
+    setSettings((prev) => ({ ...prev, apiKey: "" }))
+  }, [])
+
+  const resetSystemPrompts = useCallback(() => {
+    setPanels((prev) =>
+      prev.map((p) => ({
+        ...p,
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        title: `Panel ${p.id + 1}`,
+      }))
+    )
+  }, [])
+
+  const clearEverything = useCallback(() => {
+    abortControllersRef.current.forEach((controller) => controller.abort())
+    abortControllersRef.current.clear()
+    setSettings(DEFAULT_SETTINGS)
+    setPanels(DEFAULT_PANELS.map((p) => ({ ...p })))
+    setDraft("")
+    removeFromStorage(STORAGE_KEY_SETTINGS)
+    removeFromStorage(STORAGE_KEY_PANELS)
+    removeFromStorage(STORAGE_KEY_DRAFT)
+  }, [])
+
+  /* ------ Send message ------ */
 
   const sendMessage = useCallback(
     async (userMessage: string) => {
@@ -198,10 +318,8 @@ export function usePlayground() {
         content: userMessage,
       }
 
-      // Snapshot settings for the closure
       const currentSettings = { ...snap }
 
-      // Snapshot panels for building API payloads (use the raw state)
       let currentPanelSnapshots: PanelState[] = []
       setPanels((prev) => {
         currentPanelSnapshots = prev.slice(0, currentSettings.panelCount)
@@ -212,12 +330,10 @@ export function usePlayground() {
         )
       })
 
-      // Send requests to all active panels simultaneously
       const promises = currentPanelSnapshots.map(async (panelSnapshot) => {
         const panelId = panelSnapshot.id
         const assistantMsgId = generateId()
 
-        // Add placeholder assistant message
         setPanels((prev) =>
           prev.map((p) =>
             p.id === panelId
@@ -242,7 +358,6 @@ export function usePlayground() {
         abortControllersRef.current.set(panelId, abortController)
 
         try {
-          // Build messages payload from the snapshot (before user message was added)
           const messagesForApi = [
             ...panelSnapshot.messages.map((m) => ({
               role: m.role,
@@ -286,7 +401,6 @@ export function usePlayground() {
             accContent += delta.content
             accThinking += delta.thinking
 
-            // Capture in local const for the closure
             const contentNow = accContent
             const thinkingNow = accThinking
 
@@ -311,7 +425,6 @@ export function usePlayground() {
             )
           }
 
-          // Mark streaming as done
           const finalContent = accContent
           const finalThinking = accThinking
 
@@ -374,6 +487,9 @@ export function usePlayground() {
   return {
     settings,
     panels: panels.slice(0, settings.panelCount),
+    draft,
+    setDraft,
+    hydrated,
     updateApiKey,
     updateModel,
     updatePanelCount,
@@ -381,6 +497,9 @@ export function usePlayground() {
     updatePanelTitle,
     updateSystemPrompt,
     clearAllChats,
+    clearApiKey,
+    resetSystemPrompts,
+    clearEverything,
     sendMessage,
   }
 }

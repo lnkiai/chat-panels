@@ -1,8 +1,8 @@
 "use client"
 
-import { Eye, EyeOff, RotateCcw, Brain, Settings, X } from "lucide-react"
+import { Eye, EyeOff, Brain, Settings, X, Trash2, KeyRound, FileText, AlertTriangle } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -22,15 +22,165 @@ interface HeaderBarProps {
   onUpdateApiKey: (key: string) => void
   onUpdatePanelCount: (count: number) => void
   onToggleThinking: (enabled: boolean) => void
-  onClearAll: () => void
+  onClearChats: () => void
+  onClearApiKey: () => void
+  onResetPrompts: () => void
+  onClearEverything: () => void
 }
+
+/* ------------------------------------------------------------------ */
+/*  Manage Menu (tooltip chip)                                         */
+/* ------------------------------------------------------------------ */
+
+interface ManageMenuProps {
+  onClearChats: () => void
+  onClearApiKey: () => void
+  onResetPrompts: () => void
+  onClearEverything: () => void
+}
+
+function ManageMenu({
+  onClearChats,
+  onClearApiKey,
+  onResetPrompts,
+  onClearEverything,
+}: ManageMenuProps) {
+  const [open, setOpen] = useState(false)
+  const [confirm, setConfirm] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setConfirm(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  const actions = [
+    {
+      id: "chats",
+      label: "会話履歴を削除",
+      icon: Trash2,
+      color: "text-foreground",
+      bgHover: "hover:bg-muted/60",
+      action: onClearChats,
+    },
+    {
+      id: "apikey",
+      label: "API Keyを削除",
+      icon: KeyRound,
+      color: "text-foreground",
+      bgHover: "hover:bg-muted/60",
+      action: onClearApiKey,
+    },
+    {
+      id: "prompts",
+      label: "プロンプトをリセット",
+      icon: FileText,
+      color: "text-foreground",
+      bgHover: "hover:bg-muted/60",
+      action: onResetPrompts,
+    },
+    {
+      id: "all",
+      label: "すべて削除",
+      icon: AlertTriangle,
+      color: "text-destructive",
+      bgHover: "hover:bg-destructive/8",
+      action: onClearEverything,
+    },
+  ]
+
+  const handleAction = (id: string, action: () => void) => {
+    if (confirm === id) {
+      action()
+      setOpen(false)
+      setConfirm(null)
+    } else {
+      setConfirm(id)
+    }
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <motion.button
+        onClick={() => {
+          setOpen(!open)
+          setConfirm(null)
+        }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.9 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs transition-colors",
+          open
+            ? "text-primary bg-primary/8"
+            : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+        )}
+      >
+        <Settings className="h-3.5 w-3.5" />
+        <span>Manage</span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full right-0 mt-2 w-56 bg-card border border-border/60 rounded-2xl p-2 shadow-lg z-50"
+          >
+            <div className="flex flex-col gap-0.5">
+              {actions.map((a) => {
+                const Icon = a.icon
+                const isConfirming = confirm === a.id
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => handleAction(a.id, a.action)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all text-left",
+                      isConfirming
+                        ? a.id === "all"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-primary/10 text-primary"
+                        : cn(a.color, a.bgHover)
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1">
+                      {isConfirming ? "タップして確定" : a.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  HeaderBar                                                          */
+/* ------------------------------------------------------------------ */
 
 export function HeaderBar({
   settings,
   onUpdateApiKey,
   onUpdatePanelCount,
   onToggleThinking,
-  onClearAll,
+  onClearChats,
+  onClearApiKey,
+  onResetPrompts,
+  onClearEverything,
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -38,7 +188,6 @@ export function HeaderBar({
 
   return (
     <TooltipProvider delayDuration={300}>
-      {/* Floating header wrapper with spacing */}
       <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4 md:pb-0 z-30 relative">
         <header className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl">
           {/* Desktop layout */}
@@ -54,12 +203,12 @@ export function HeaderBar({
                   className="h-5 w-5"
                 />
               </div>
-            <h1 className="text-sm font-heading tracking-tight text-foreground">
-              Longcat AI Playground
-            </h1>
-          </div>
+              <h1 className="text-sm font-heading tracking-tight text-foreground">
+                Longcat AI Playground
+              </h1>
+            </div>
 
-          {/* Center: Controls */}
+            {/* Center: Controls */}
             <div className="flex items-center gap-4">
               {/* API Key */}
               <div className="flex items-center gap-2">
@@ -82,7 +231,7 @@ export function HeaderBar({
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="absolute right-2.5 text-muted-foreground hover:text-primary transition-colors"
-                    aria-label={showApiKey ? "API Keyを非表示" : "API Keyを表示"}
+                    aria-label={showApiKey ? "Hide" : "Show"}
                   >
                     {showApiKey ? (
                       <EyeOff className="h-3.5 w-3.5" />
@@ -113,7 +262,7 @@ export function HeaderBar({
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background/60 text-foreground border-border/60 hover:border-primary/40 hover:text-primary"
                     )}
-                    aria-label={`${count}パネル`}
+                    aria-label={`${count} panels`}
                     aria-pressed={settings.panelCount === count}
                   >
                     {count}
@@ -163,25 +312,14 @@ export function HeaderBar({
               </Tooltip>
             </div>
 
-            {/* Right: Reset */}
+            {/* Right: Manage menu */}
             <div className="shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.button
-                    onClick={onClearAll}
-                    whileHover={{ scale: 1.05, rotate: -15 }}
-                    whileTap={{ scale: 0.9, rotate: -90 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                    className="inline-flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    <span>Reset</span>
-                  </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs rounded-xl">
-                  全チャット履歴をクリア
-                </TooltipContent>
-              </Tooltip>
+              <ManageMenu
+                onClearChats={onClearChats}
+                onClearApiKey={onClearApiKey}
+                onResetPrompts={onResetPrompts}
+                onClearEverything={onClearEverything}
+              />
             </div>
           </div>
 
@@ -197,21 +335,17 @@ export function HeaderBar({
                   className="h-4 w-4"
                 />
               </div>
-            <h1 className="text-sm font-heading tracking-tight text-foreground">
-              Longcat AI
-            </h1>
+              <h1 className="text-sm font-heading tracking-tight text-foreground">
+                Longcat AI
+              </h1>
             </div>
             <div className="flex items-center gap-0.5">
-              <motion.button
-                onClick={onClearAll}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.85, rotate: -90 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="h-8 w-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary transition-colors"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span className="sr-only">Reset</span>
-              </motion.button>
+              <ManageMenu
+                onClearChats={onClearChats}
+                onClearApiKey={onClearApiKey}
+                onResetPrompts={onResetPrompts}
+                onClearEverything={onClearEverything}
+              />
               <motion.button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 whileHover={{ scale: 1.1 }}
@@ -229,7 +363,7 @@ export function HeaderBar({
                 ) : (
                   <Settings className="h-4 w-4" />
                 )}
-                <span className="sr-only">設定</span>
+                <span className="sr-only">Settings</span>
               </motion.button>
             </div>
           </div>
@@ -266,9 +400,7 @@ export function HeaderBar({
                         type="button"
                         onClick={() => setShowApiKey(!showApiKey)}
                         className="absolute right-2.5 text-muted-foreground hover:text-primary transition-colors"
-                        aria-label={
-                          showApiKey ? "API Keyを非表示" : "API Keyを表示"
-                        }
+                        aria-label={showApiKey ? "Hide" : "Show"}
                       >
                         {showApiKey ? (
                           <EyeOff className="h-3.5 w-3.5" />
@@ -302,7 +434,7 @@ export function HeaderBar({
                               ? "bg-primary text-primary-foreground border-primary"
                               : "bg-background/60 text-foreground border-border/60 hover:border-primary/40"
                           )}
-                          aria-label={`${count}パネル`}
+                          aria-label={`${count} panels`}
                           aria-pressed={settings.panelCount === count}
                         >
                           {count}

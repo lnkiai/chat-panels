@@ -13,6 +13,8 @@ interface MessageInputProps {
   isAnyPanelLoading?: boolean
   model: ModelId
   onUpdateModel: (model: ModelId) => void
+  draft: string
+  setDraft: (value: string) => void
 }
 
 export function MessageInput({
@@ -21,8 +23,11 @@ export function MessageInput({
   isAnyPanelLoading,
   model,
   onUpdateModel,
+  draft,
+  setDraft,
 }: MessageInputProps) {
-  const [value, setValue] = useState("")
+  const value = draft
+  const setValue = setDraft
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
