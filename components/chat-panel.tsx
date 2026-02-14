@@ -29,7 +29,7 @@ export function ChatPanel({
   onUpdateSystemPrompt,
   onUpdateTitle,
 }: ChatPanelProps) {
-  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
+  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(true)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(panel.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -208,15 +208,15 @@ function GlassOverlay({
       {show && (
         <motion.div
           ref={overlayRef}
-          initial={{ opacity: 0, y: 6, scale: 0.95, backdropFilter: "blur(0px)" }}
-          animate={{ opacity: 1, y: 0, scale: 1, backdropFilter: "blur(20px)" }}
-          exit={{ opacity: 0, y: 4, scale: 0.97, backdropFilter: "blur(0px)" }}
+          initial={{ opacity: 0, y: 6, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 4, scale: 0.97 }}
           transition={{ type: "spring", stiffness: 380, damping: 22 }}
           className="absolute bottom-0 left-0 right-0 z-10"
         >
           <div
-            className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50"
-            style={{ backgroundColor: "hsl(var(--card) / 0.72)" }}
+            className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 backdrop-blur-xl"
+            style={{ backgroundColor: "hsl(var(--card) / 0.65)" }}
           >
             <button
               onClick={handleCopy}
@@ -348,35 +348,24 @@ function AssistantMessage({
         )}
       >
         {message.content ? (
-          <Streamdown isAnimating={!!message.isStreaming}>
-            {message.content}
-          </Streamdown>
+          <>
+            <Streamdown isAnimating={!!message.isStreaming}>
+              {message.content}
+            </Streamdown>
+            {message.isStreaming && isLast && (
+              <div className="mt-2 flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin text-primary/50" />
+                <span className="text-[10px] text-muted-foreground/50">{"生成中..."}</span>
+              </div>
+            )}
+          </>
         ) : message.isStreaming ? (
-          <div className="flex items-center gap-1.5 py-1">
-            {[0, 1, 2].map((dot) => (
-              <motion.span
-                key={dot}
-                className="inline-block h-1.5 w-1.5 rounded-full bg-primary"
-                animate={{ y: [0, -4, 0] }}
-                transition={{
-                  duration: 0.6,
-                  repeat: Infinity,
-                  delay: dot * 0.15,
-                  ease: "easeInOut",
-                }}
-              />
-            ))}
+          <div className="flex items-center gap-2 py-1">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span className="text-xs text-muted-foreground">{"生成中..."}</span>
           </div>
         ) : null}
       </div>
-
-      {/* Loading indicator */}
-      {message.isStreaming && isLast && (
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <Loader2 className="h-3 w-3 animate-spin text-primary/50" />
-          <span className="text-[10px] text-muted-foreground/50">{"生成中..."}</span>
-        </div>
-      )}
 
       {/* Glass overlay */}
       <GlassOverlay
