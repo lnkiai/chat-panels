@@ -24,8 +24,8 @@ export default function PlaygroundPage() {
   const count = settings.panelCount
 
   return (
-    <div className="flex flex-col h-dvh">
-      {/* Header Control Bar */}
+    <div className="flex flex-col h-dvh bg-background">
+      {/* Header */}
       <HeaderBar
         settings={settings}
         onUpdateApiKey={updateApiKey}
@@ -36,12 +36,12 @@ export default function PlaygroundPage() {
 
       {/* Main Chat Grid */}
       <main className="flex-1 min-h-0 overflow-hidden">
-        {/* Mobile: always vertical stack */}
+        {/* Mobile: vertical stack */}
         <div className="flex flex-col md:hidden h-full">
           {panels.map((panel, idx) => (
             <div
               key={panel.id}
-              className="min-h-0 border-b last:border-b-0"
+              className="min-h-0 border-b border-border last:border-b-0"
               style={{
                 flexBasis: `${100 / count}%`,
                 flexGrow: 1,
@@ -61,17 +61,16 @@ export default function PlaygroundPage() {
           ))}
         </div>
 
-        {/* Desktop: smart grid layout */}
+        {/* Desktop: smart grid */}
         <div className="hidden md:block h-full">
           {count <= 3 ? (
-            /* 1-3 panels: horizontal row */
             <div className="flex h-full">
               {panels.map((panel, idx) => (
                 <div
                   key={panel.id}
                   className={cn(
                     "min-w-0 h-full",
-                    idx < count - 1 && "border-r"
+                    idx < count - 1 && "border-r border-border"
                   )}
                   style={{
                     flexBasis: `${100 / count}%`,
@@ -94,15 +93,14 @@ export default function PlaygroundPage() {
               ))}
             </div>
           ) : count === 4 ? (
-            /* 4 panels: 2x2 grid */
             <div className="grid grid-cols-2 grid-rows-2 h-full">
               {panels.map((panel, idx) => (
                 <div
                   key={panel.id}
                   className={cn(
                     "min-w-0 min-h-0 overflow-hidden",
-                    idx % 2 === 0 && "border-r",
-                    idx < 2 && "border-b"
+                    idx % 2 === 0 && "border-r border-border",
+                    idx < 2 && "border-b border-border"
                   )}
                 >
                   <ChatPanel
@@ -120,16 +118,15 @@ export default function PlaygroundPage() {
               ))}
             </div>
           ) : (
-            /* 5 panels: 3 top + 2 bottom */
             <div className="flex flex-col h-full">
               {/* Top row: 3 panels */}
-              <div className="flex flex-1 min-h-0 border-b">
+              <div className="flex flex-1 min-h-0 border-b border-border">
                 {panels.slice(0, 3).map((panel, idx) => (
                   <div
                     key={panel.id}
                     className={cn(
                       "min-w-0 h-full",
-                      idx < 2 && "border-r"
+                      idx < 2 && "border-r border-border"
                     )}
                     style={{
                       flexBasis: "33.333%",
@@ -158,7 +155,7 @@ export default function PlaygroundPage() {
                     key={panel.id}
                     className={cn(
                       "min-w-0 h-full",
-                      idx < 1 && "border-r"
+                      idx < 1 && "border-r border-border"
                     )}
                     style={{
                       flexBasis: "50%",
@@ -185,7 +182,7 @@ export default function PlaygroundPage() {
         </div>
       </main>
 
-      {/* Global Input Area - with model selector */}
+      {/* Global Input */}
       <MessageInput
         onSend={sendMessage}
         disabled={!settings.apiKey.trim()}

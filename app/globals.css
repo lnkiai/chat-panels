@@ -10,26 +10,26 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 5%;
+    --background: 210 33% 98%;
+    --foreground: 222 47% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 5%;
+    --card-foreground: 222 47% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 5%;
-    --primary: 0 0% 5%;
+    --popover-foreground: 222 47% 10%;
+    --primary: 210 100% 62%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 97%;
-    --secondary-foreground: 0 0% 5%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 5%;
+    --secondary: 210 20% 92%;
+    --secondary-foreground: 222 47% 10%;
+    --muted: 210 25% 96%;
+    --muted-foreground: 215 14% 46%;
+    --accent: 210 100% 62%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 87%;
-    --input: 0 0% 87%;
-    --ring: 0 0% 5%;
-    --radius: 0.375rem;
+    --border: 216 20% 93%;
+    --input: 216 20% 93%;
+    --ring: 210 100% 62%;
+    --radius: 0.5rem;
   }
 }
 
@@ -42,7 +42,7 @@
   }
 }
 
-/* Markdown prose styles */
+/* Streamdown / Markdown prose styles */
 .prose {
   @apply text-sm leading-relaxed;
 }
@@ -87,10 +87,10 @@
   @apply bg-transparent p-0;
 }
 .prose blockquote {
-  @apply border-l-2 border-border pl-3 italic text-muted-foreground mb-3;
+  @apply border-l-2 border-primary/30 pl-3 italic text-muted-foreground mb-3;
 }
 .prose a {
-  @apply underline underline-offset-2;
+  @apply underline underline-offset-2 text-primary;
 }
 .prose hr {
   @apply border-border my-4;

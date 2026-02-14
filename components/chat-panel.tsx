@@ -10,6 +10,7 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
 import type { PanelState } from "@/lib/types"
@@ -53,23 +54,27 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-w-0">
-      {/* Panel header with title + system prompt toggle */}
-      <div className="border-b shrink-0">
-        <div className="flex items-center w-full px-3 py-2">
+    <div className="flex flex-col h-full min-w-0 bg-card">
+      {/* Panel header */}
+      <div className="border-b border-border shrink-0">
+        <div className="flex items-center w-full px-3 py-2.5">
           {/* Collapsible toggle */}
-          <button
+          <motion.button
             onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
             aria-expanded={isSystemPromptOpen}
           >
-            {isSystemPromptOpen ? (
-              <ChevronDown className="h-3 w-3" />
-            ) : (
+            <motion.span
+              animate={{ rotate: isSystemPromptOpen ? 90 : 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            >
               <ChevronRight className="h-3 w-3" />
-            )}
+            </motion.span>
             <Settings2 className="h-3 w-3" />
-          </button>
+          </motion.button>
 
           {/* Editable title */}
           {isEditingTitle ? (
@@ -85,7 +90,7 @@ export function ChatPanel({
                   setIsEditingTitle(false)
                 }
               }}
-              className="ml-2 text-xs font-medium bg-transparent border-b border-foreground outline-none px-0 py-0 w-24"
+              className="ml-2.5 text-xs font-semibold bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-28 text-foreground"
               maxLength={30}
             />
           ) : (
@@ -94,14 +99,14 @@ export function ChatPanel({
                 setTitleDraft(panel.title)
                 setIsEditingTitle(true)
               }}
-              className="ml-2 flex items-center gap-1 text-xs font-medium text-foreground hover:text-muted-foreground transition-colors group"
+              className="ml-2.5 flex items-center gap-1.5 text-xs font-semibold text-foreground hover:text-primary transition-colors group"
             >
               <span>{panel.title}</span>
               <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
             </button>
           )}
 
-          {/* System prompt preview when collapsed */}
+          {/* System prompt preview */}
           {!isSystemPromptOpen && (
             <span className="ml-2 text-[10px] text-muted-foreground truncate">
               {panel.systemPrompt.slice(0, 40)}
@@ -110,21 +115,31 @@ export function ChatPanel({
           )}
         </div>
 
-        {isSystemPromptOpen && (
-          <div className="px-3 pb-3">
-            <Textarea
-              value={panel.systemPrompt}
-              onChange={(e) => onUpdateSystemPrompt(e.target.value)}
-              className="text-xs min-h-[60px] resize-none font-mono bg-muted/50 border-border"
-              placeholder="System prompt..."
-              rows={3}
-            />
-          </div>
-        )}
+        <AnimatePresence>
+          {isSystemPromptOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="overflow-hidden"
+            >
+              <div className="px-3 pb-3">
+                <Textarea
+                  value={panel.systemPrompt}
+                  onChange={(e) => onUpdateSystemPrompt(e.target.value)}
+                  className="text-xs min-h-[60px] resize-none font-mono bg-background border-border rounded-xl focus-visible:ring-primary/30"
+                  placeholder="System prompt..."
+                  rows={3}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Messages area - fixed height with internal scroll */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-background">
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-muted-foreground">
@@ -132,26 +147,37 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="divide-y">
-            {panel.messages.map((message) => (
-              <div key={message.id} className="px-3 py-3">
+          <div className="divide-y divide-border">
+            {panel.messages.map((message, i) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 24,
+                  delay: i === panel.messages.length - 1 ? 0 : 0,
+                }}
+                className="px-3 py-3.5"
+              >
                 {/* Message header */}
                 <div className="flex items-center gap-2 mb-2">
                   {message.role === "user" ? (
                     <>
-                      <div className="flex items-center justify-center h-5 w-5 rounded-sm border bg-background">
-                        <User className="h-3 w-3" />
+                      <div className="flex items-center justify-center h-5 w-5 rounded-lg border border-border bg-card">
+                        <User className="h-3 w-3 text-muted-foreground" />
                       </div>
-                      <span className="text-xs font-medium">You</span>
+                      <span className="text-xs font-semibold text-foreground">You</span>
                     </>
                   ) : (
                     <>
-                      <div className="flex items-center justify-center h-5 w-5 rounded-sm border bg-foreground text-background">
+                      <div className="flex items-center justify-center h-5 w-5 rounded-lg bg-primary text-primary-foreground">
                         <Bot className="h-3 w-3" />
                       </div>
-                      <span className="text-xs font-medium">Assistant</span>
+                      <span className="text-xs font-semibold text-foreground">Assistant</span>
                       {message.isStreaming && (
-                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        <Loader2 className="h-3 w-3 animate-spin text-primary" />
                       )}
                     </>
                   )}
@@ -168,7 +194,7 @@ export function ChatPanel({
                 {/* Message content */}
                 <div className="pl-7">
                   {message.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap">
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
                       {message.content}
                     </p>
                   ) : message.content ? (
@@ -178,14 +204,24 @@ export function ChatPanel({
                       </Streamdown>
                     </div>
                   ) : message.isStreaming ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse" />
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:150ms]" />
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse [animation-delay:300ms]" />
+                    <div className="flex items-center gap-1.5 py-1">
+                      {[0, 1, 2].map((dot) => (
+                        <motion.span
+                          key={dot}
+                          className="inline-block h-1.5 w-1.5 rounded-full bg-primary"
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{
+                            duration: 0.6,
+                            repeat: Infinity,
+                            delay: dot * 0.15,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      ))}
                     </div>
                   ) : null}
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
@@ -205,26 +241,39 @@ function ThinkingBlock({
 
   return (
     <div className="pl-7 mb-2">
-      <button
+      <motion.button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
         aria-expanded={isOpen}
       >
-        {isOpen ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
+        <motion.span
+          animate={{ rotate: isOpen ? 90 : 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
           <ChevronRight className="h-3 w-3" />
-        )}
+        </motion.span>
         <span className="font-medium">
           {"Thinking Process"}
           {isStreaming && " ..."}
         </span>
-      </button>
-      {isOpen && (
-        <div className="mt-1.5 p-2.5 bg-muted/50 border rounded-sm text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto">
-          <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
-        </div>
-      )}
+      </motion.button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-1.5 p-3 bg-primary/5 border border-primary/15 rounded-xl text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto">
+              <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
