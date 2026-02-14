@@ -104,7 +104,7 @@ export function ChatPanel({
             </button>
           )}
 
-          {/* System prompt tiny preview - very short */}
+          {/* System prompt tiny preview */}
           {!isSystemPromptOpen && (
             <span className="ml-auto text-[10px] text-muted-foreground/50 truncate max-w-[80px]">
               {panel.systemPrompt.slice(0, 16)}
@@ -164,6 +164,102 @@ export function ChatPanel({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Shared Glass Overlay                                               */
+/* ------------------------------------------------------------------ */
+
+function GlassOverlay({
+  content,
+  show,
+  onClose,
+}: {
+  content: string
+  show: boolean
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  const charCount = content.length
+  const tokenEstimate = Math.ceil(charCount / 3)
+
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      navigator.clipboard.writeText(content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    },
+    [content]
+  )
+
+  useEffect(() => {
+    if (!show) return
+    const handler = (e: MouseEvent) => {
+      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [show, onClose])
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          ref={overlayRef}
+          initial={{ opacity: 0, y: 6, scale: 0.95, backdropFilter: "blur(0px)" }}
+          animate={{ opacity: 1, y: 0, scale: 1, backdropFilter: "blur(20px)" }}
+          exit={{ opacity: 0, y: 4, scale: 0.97, backdropFilter: "blur(0px)" }}
+          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+          className="absolute bottom-0 left-0 right-0 z-10"
+        >
+          <div
+            className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50"
+            style={{ backgroundColor: "hsl(var(--card) / 0.72)" }}
+          >
+            <button
+              onClick={handleCopy}
+              className={cn(
+                "flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-all",
+                copied
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              )}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3" />
+                  <span>{"Copied"}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" />
+                  <span>{"Copy"}</span>
+                </>
+              )}
+            </button>
+
+            <div className="h-4 w-px bg-border/40" />
+
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground/70">
+              <span className="flex items-center gap-1">
+                <Type className="h-2.5 w-2.5" />
+                {charCount.toLocaleString()} {"chars"}
+              </span>
+              <span>
+                {"~"}
+                {tokenEstimate.toLocaleString()} {"tokens"}
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Message dispatcher                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -181,10 +277,13 @@ function MessageBubble({
 }
 
 /* ------------------------------------------------------------------ */
-/*  User bubble - right-aligned speech bubble                          */
+/*  User bubble - right-aligned, with glass overlay on tap             */
 /* ------------------------------------------------------------------ */
 
 function UserBubble({ content }: { content: string }) {
+  const [showOverlay, setShowOverlay] = useState(false)
+  const close = useCallback(() => setShowOverlay(false), [])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -192,17 +291,23 @@ function UserBubble({ content }: { content: string }) {
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className="flex justify-end"
     >
-      <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5">
-        <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">
-          {content}
-        </p>
+      <div className="relative max-w-[85%]">
+        <div
+          onClick={() => content.trim() && setShowOverlay((p) => !p)}
+          className="px-3.5 py-2.5 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5 cursor-pointer"
+        >
+          <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">
+            {content}
+          </p>
+        </div>
+        <GlassOverlay content={content} show={showOverlay} onClose={close} />
       </div>
     </motion.div>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Assistant message - full width, no label, glass overlay on tap     */
+/*  Assistant message - full width, glass overlay on tap               */
 /* ------------------------------------------------------------------ */
 
 function AssistantMessage({
@@ -213,30 +318,7 @@ function AssistantMessage({
   isLast: boolean
 }) {
   const [showOverlay, setShowOverlay] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const overlayRef = useRef<HTMLDivElement>(null)
-
-  const charCount = message.content.length
-  // Rough token estimate: ~4 chars per token for English, ~1.5 for Japanese mixed
-  const tokenEstimate = Math.ceil(charCount / 3)
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(message.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [message.content])
-
-  // Close overlay on click outside
-  useEffect(() => {
-    if (!showOverlay) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        setShowOverlay(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showOverlay])
+  const close = useCallback(() => setShowOverlay(false), [])
 
   return (
     <motion.div
@@ -253,11 +335,11 @@ function AssistantMessage({
         />
       )}
 
-      {/* Content - clickable for overlay */}
+      {/* Content */}
       <div
         onClick={() => {
           if (!message.isStreaming && message.content.trim()) {
-            setShowOverlay((prev) => !prev)
+            setShowOverlay((p) => !p)
           }
         }}
         className={cn(
@@ -289,68 +371,19 @@ function AssistantMessage({
       </div>
 
       {/* Loading indicator */}
-      {message.isStreaming && (
+      {message.isStreaming && isLast && (
         <div className="mt-1.5 flex items-center gap-1.5">
           <Loader2 className="h-3 w-3 animate-spin text-primary/50" />
           <span className="text-[10px] text-muted-foreground/50">{"生成中..."}</span>
         </div>
       )}
 
-      {/* Glass overlay - floating action bar */}
-      <AnimatePresence>
-        {showOverlay && !message.isStreaming && (
-          <motion.div
-            ref={overlayRef}
-            initial={{ opacity: 0, y: 6, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 24 }}
-            className="absolute bottom-0 left-0 right-0 z-10"
-          >
-            <div className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-card/70 backdrop-blur-xl border border-border/50 shadow-sm">
-              {/* Copy button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleCopy()
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-all",
-                  copied
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                )}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-3 w-3" />
-                    <span>{"Copied"}</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" />
-                    <span>{"Copy"}</span>
-                  </>
-                )}
-              </button>
-
-              {/* Divider */}
-              <div className="h-4 w-px bg-border/40" />
-
-              {/* Stats */}
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground/70">
-                <span className="flex items-center gap-1">
-                  <Type className="h-2.5 w-2.5" />
-                  {charCount.toLocaleString()} {"chars"}
-                </span>
-                <span>
-                  {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Glass overlay */}
+      <GlassOverlay
+        content={message.content}
+        show={showOverlay && !message.isStreaming}
+        onClose={close}
+      />
     </motion.div>
   )
 }
