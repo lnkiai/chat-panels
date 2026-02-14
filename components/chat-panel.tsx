@@ -4,12 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import {
   ChevronRight,
   Settings2,
-  User,
-  Bot,
   Loader2,
   Pencil,
   Copy,
   Check,
+  Type,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
@@ -56,14 +55,14 @@ export function ChatPanel({
     <div className="flex flex-col h-full min-w-0 bg-card rounded-2xl border border-border/60 overflow-hidden">
       {/* Panel header */}
       <div className="shrink-0">
-        <div className="flex items-center w-full px-3.5 py-3">
+        <div className="flex items-center w-full px-3.5 py-2.5">
           {/* Collapsible toggle */}
           <motion.button
             onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
             aria-expanded={isSystemPromptOpen}
           >
             <motion.span
@@ -89,7 +88,7 @@ export function ChatPanel({
                   setIsEditingTitle(false)
                 }
               }}
-              className="ml-2.5 text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-28 text-foreground"
+              className="ml-2 text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-24 text-foreground"
               maxLength={30}
             />
           ) : (
@@ -98,18 +97,18 @@ export function ChatPanel({
                 setTitleDraft(panel.title)
                 setIsEditingTitle(true)
               }}
-              className="ml-2.5 flex items-center gap-1.5 text-xs font-heading text-foreground hover:text-primary transition-colors group"
+              className="ml-2 flex items-center gap-1 text-xs font-heading text-foreground hover:text-primary transition-colors group"
             >
               <span>{panel.title}</span>
               <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
             </button>
           )}
 
-          {/* System prompt preview */}
+          {/* System prompt tiny preview - very short */}
           {!isSystemPromptOpen && (
-            <span className="ml-2 text-[10px] text-muted-foreground truncate">
-              {panel.systemPrompt.slice(0, 40)}
-              {panel.systemPrompt.length > 40 ? "..." : ""}
+            <span className="ml-auto text-[10px] text-muted-foreground/50 truncate max-w-[80px]">
+              {panel.systemPrompt.slice(0, 16)}
+              {"..."}
             </span>
           )}
         </div>
@@ -123,13 +122,13 @@ export function ChatPanel({
               transition={{ type: "spring", stiffness: 300, damping: 28 }}
               className="overflow-hidden"
             >
-              <div className="px-3.5 pt-1 pb-3.5">
+              <div className="px-3.5 pb-3">
                 <Textarea
                   value={panel.systemPrompt}
                   onChange={(e) => onUpdateSystemPrompt(e.target.value)}
-                  className="text-xs min-h-[60px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40"
+                  className="text-xs min-h-[56px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40"
                   placeholder="System prompt..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
             </motion.div>
@@ -144,12 +143,12 @@ export function ChatPanel({
       <div className="flex-1 overflow-y-auto min-h-0 bg-background/40 custom-scrollbar">
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-muted-foreground/60">
-              {"メッセージを入力して送信してください"}
+            <p className="text-xs text-muted-foreground/50">
+              {"メッセージを入力してください"}
             </p>
           </div>
         ) : (
-          <div className="px-3 py-4 space-y-4">
+          <div className="px-3 py-3 flex flex-col gap-3">
             {panel.messages.map((message, i) => (
               <MessageBubble
                 key={message.id}
@@ -165,9 +164,7 @@ export function ChatPanel({
 }
 
 /* ------------------------------------------------------------------ */
-/* Message bubble - reference design:                                  */
-/*   User: right-aligned, rounded with cut top-right corner, white bg */
-/*   AI: full-width, no wrapper card, content + action bar            */
+/*  Message dispatcher                                                 */
 /* ------------------------------------------------------------------ */
 
 function MessageBubble({
@@ -177,47 +174,25 @@ function MessageBubble({
   message: PanelState["messages"][number]
   isLast: boolean
 }) {
-  const isUser = message.role === "user"
-
-  if (isUser) {
+  if (message.role === "user") {
     return <UserBubble content={message.content} />
   }
-
-  return (
-    <AssistantMessage
-      message={message}
-      isLast={isLast}
-    />
-  )
+  return <AssistantMessage message={message} isLast={isLast} />
 }
 
-/* --- User bubble --- */
+/* ------------------------------------------------------------------ */
+/*  User bubble - right-aligned speech bubble                          */
+/* ------------------------------------------------------------------ */
+
 function UserBubble({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [content])
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
-      className="flex justify-end group"
+      className="flex justify-end"
     >
-      {/* Hover copy button on the left */}
-      <button
-        onClick={handleCopy}
-        className="self-center mr-2 h-7 w-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all text-muted-foreground hover:text-foreground hover:bg-muted/60"
-        title={copied ? "Copied" : "Copy"}
-      >
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      </button>
-
-      <div className="max-w-[80%] px-4 py-3 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5">
+      <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5">
         <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground">
           {content}
         </p>
@@ -226,7 +201,10 @@ function UserBubble({ content }: { content: string }) {
   )
 }
 
-/* --- Assistant message --- */
+/* ------------------------------------------------------------------ */
+/*  Assistant message - full width, no label, glass overlay on tap     */
+/* ------------------------------------------------------------------ */
+
 function AssistantMessage({
   message,
   isLast,
@@ -234,7 +212,13 @@ function AssistantMessage({
   message: PanelState["messages"][number]
   isLast: boolean
 }) {
+  const [showOverlay, setShowOverlay] = useState(false)
   const [copied, setCopied] = useState(false)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  const charCount = message.content.length
+  // Rough token estimate: ~4 chars per token for English, ~1.5 for Japanese mixed
+  const tokenEstimate = Math.ceil(charCount / 3)
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(message.content)
@@ -242,24 +226,25 @@ function AssistantMessage({
     setTimeout(() => setCopied(false), 2000)
   }, [message.content])
 
+  // Close overlay on click outside
+  useEffect(() => {
+    if (!showOverlay) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
+        setShowOverlay(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [showOverlay])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
-      className="w-full"
+      className="w-full relative"
     >
-      {/* Header: icon + label */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex items-center justify-center h-6 w-6 rounded-lg bg-primary text-primary-foreground">
-          <Bot className="h-3.5 w-3.5" />
-        </div>
-        <span className="text-xs font-heading text-foreground">Assistant</span>
-        {message.isStreaming && (
-          <Loader2 className="h-3 w-3 animate-spin text-primary" />
-        )}
-      </div>
-
       {/* Thinking process */}
       {message.thinking && message.thinking.length > 0 && (
         <ThinkingBlock
@@ -268,14 +253,22 @@ function AssistantMessage({
         />
       )}
 
-      {/* Content */}
-      <div className="pl-8">
+      {/* Content - clickable for overlay */}
+      <div
+        onClick={() => {
+          if (!message.isStreaming && message.content.trim()) {
+            setShowOverlay((prev) => !prev)
+          }
+        }}
+        className={cn(
+          "text-sm leading-relaxed cursor-default",
+          !message.isStreaming && message.content.trim() && "cursor-pointer"
+        )}
+      >
         {message.content ? (
-          <div className="text-sm leading-relaxed">
-            <Streamdown isAnimating={!!message.isStreaming}>
-              {message.content}
-            </Streamdown>
-          </div>
+          <Streamdown isAnimating={!!message.isStreaming}>
+            {message.content}
+          </Streamdown>
         ) : message.isStreaming ? (
           <div className="flex items-center gap-1.5 py-1">
             {[0, 1, 2].map((dot) => (
@@ -293,34 +286,79 @@ function AssistantMessage({
             ))}
           </div>
         ) : null}
-
-        {/* Action bar - only after streaming complete */}
-        {!message.isStreaming && message.content.trim() !== "" && (
-          <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-border/30">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 h-7 px-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all text-xs"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3 w-3" />
-                  <span>{"コピー済み"}</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3" />
-                  <span>{"コピー"}</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Loading indicator */}
+      {message.isStreaming && (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin text-primary/50" />
+          <span className="text-[10px] text-muted-foreground/50">{"生成中..."}</span>
+        </div>
+      )}
+
+      {/* Glass overlay - floating action bar */}
+      <AnimatePresence>
+        {showOverlay && !message.isStreaming && (
+          <motion.div
+            ref={overlayRef}
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 400, damping: 24 }}
+            className="absolute bottom-0 left-0 right-0 z-10"
+          >
+            <div className="mx-1 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-card/70 backdrop-blur-xl border border-border/50 shadow-sm">
+              {/* Copy button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCopy()
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-all",
+                  copied
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                )}
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    <span>{"Copied"}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span>{"Copy"}</span>
+                  </>
+                )}
+              </button>
+
+              {/* Divider */}
+              <div className="h-4 w-px bg-border/40" />
+
+              {/* Stats */}
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground/70">
+                <span className="flex items-center gap-1">
+                  <Type className="h-2.5 w-2.5" />
+                  {charCount.toLocaleString()} {"chars"}
+                </span>
+                <span>
+                  {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
 
-/* --- Thinking block --- */
+/* ------------------------------------------------------------------ */
+/*  Thinking block                                                     */
+/* ------------------------------------------------------------------ */
+
 function ThinkingBlock({
   thinking,
   isStreaming,
@@ -331,7 +369,7 @@ function ThinkingBlock({
   const [isOpen, setIsOpen] = useState(true)
 
   return (
-    <div className="pl-8 mb-2">
+    <div className="mb-2">
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         whileHover={{ scale: 1.02 }}
@@ -359,7 +397,7 @@ function ThinkingBlock({
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="overflow-hidden"
           >
-            <div className="mt-1.5 p-3 bg-primary/5 border border-primary/10 rounded-xl text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-64 overflow-y-auto custom-scrollbar">
+            <div className="mt-1.5 p-3 bg-primary/5 border border-primary/10 rounded-xl text-xs text-muted-foreground leading-relaxed overflow-x-auto max-h-48 overflow-y-auto custom-scrollbar">
               <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
             </div>
           </motion.div>
