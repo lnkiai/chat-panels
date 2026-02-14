@@ -4,12 +4,12 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import {
   ChevronRight,
   Settings2,
-  Loader2,
   Pencil,
   Copy,
   Check,
   Type,
 } from "lucide-react"
+import { TextShimmer } from "@/components/core/text-shimmer"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
@@ -351,16 +351,18 @@ function AssistantMessage({
               {message.content}
             </Streamdown>
             {message.isStreaming && isLast && (
-              <div className="mt-2 flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin text-primary/50" />
-                <span className="text-[10px] text-muted-foreground/50">{"生成中..."}</span>
+              <div className="mt-2">
+                <TextShimmer className="text-[11px] font-mono" duration={1.2}>
+                  generating...
+                </TextShimmer>
               </div>
             )}
           </>
         ) : message.isStreaming ? (
-          <div className="flex items-center gap-2 py-1">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">{"生成中..."}</span>
+          <div className="py-1">
+            <TextShimmer className="text-xs font-mono" duration={1}>
+              generating...
+            </TextShimmer>
           </div>
         ) : null}
       </div>

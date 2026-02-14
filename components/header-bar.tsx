@@ -1,6 +1,16 @@
 "use client"
 
-import { Eye, EyeOff, Brain, Settings, X, Trash2, KeyRound, FileText, AlertTriangle } from "lucide-react"
+import {
+  Eye,
+  EyeOff,
+  Brain,
+  Settings,
+  X,
+  Trash2,
+  KeyRound,
+  RotateCcw,
+  Ellipsis,
+} from "lucide-react"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -29,8 +39,31 @@ interface HeaderBarProps {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Manage Menu (tooltip chip)                                         */
+/*  Manage Menu - 3 icon tab selector + delete button                  */
 /* ------------------------------------------------------------------ */
+
+const MANAGE_TABS = [
+  {
+    id: "chats",
+    label: "会話",
+    icon: Trash2,
+    description: "会話履歴を削除",
+  },
+  {
+    id: "apikey",
+    label: "API Key",
+    icon: KeyRound,
+    description: "API Keyを削除",
+  },
+  {
+    id: "all",
+    label: "すべて",
+    icon: RotateCcw,
+    description: "すべてリセット",
+  },
+] as const
+
+type ManageTabId = (typeof MANAGE_TABS)[number]["id"]
 
 interface ManageMenuProps {
   onClearChats: () => void
@@ -42,11 +75,11 @@ interface ManageMenuProps {
 function ManageMenu({
   onClearChats,
   onClearApiKey,
-  onResetPrompts,
   onClearEverything,
 }: ManageMenuProps) {
   const [open, setOpen] = useState(false)
-  const [confirm, setConfirm] = useState<string | null>(null)
+  const [selected, setSelected] = useState<ManageTabId>("chats")
+  const [confirming, setConfirming] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,77 +87,46 @@ function ManageMenu({
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false)
-        setConfirm(null)
+        setConfirming(false)
       }
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [open])
 
-  const actions = [
-    {
-      id: "chats",
-      label: "会話履歴を削除",
-      icon: Trash2,
-      color: "text-foreground",
-      bgHover: "hover:bg-muted/60",
-      action: onClearChats,
-    },
-    {
-      id: "apikey",
-      label: "API Keyを削除",
-      icon: KeyRound,
-      color: "text-foreground",
-      bgHover: "hover:bg-muted/60",
-      action: onClearApiKey,
-    },
-    {
-      id: "prompts",
-      label: "プロンプトをリセット",
-      icon: FileText,
-      color: "text-foreground",
-      bgHover: "hover:bg-muted/60",
-      action: onResetPrompts,
-    },
-    {
-      id: "all",
-      label: "すべて削除",
-      icon: AlertTriangle,
-      color: "text-destructive",
-      bgHover: "hover:bg-destructive/8",
-      action: onClearEverything,
-    },
-  ]
-
-  const handleAction = (id: string, action: () => void) => {
-    if (confirm === id) {
-      action()
-      setOpen(false)
-      setConfirm(null)
-    } else {
-      setConfirm(id)
+  const handleDelete = () => {
+    if (!confirming) {
+      setConfirming(true)
+      return
     }
+    // Execute
+    if (selected === "chats") onClearChats()
+    else if (selected === "apikey") onClearApiKey()
+    else onClearEverything()
+    setOpen(false)
+    setConfirming(false)
   }
+
+  const currentTab = MANAGE_TABS.find((t) => t.id === selected)!
 
   return (
     <div className="relative" ref={menuRef}>
       <motion.button
         onClick={() => {
           setOpen(!open)
-          setConfirm(null)
+          setConfirming(false)
         }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
         transition={{ type: "spring", stiffness: 400, damping: 17 }}
         className={cn(
-          "inline-flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs transition-colors",
+          "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-colors",
           open
             ? "text-primary bg-primary/8"
             : "text-muted-foreground hover:text-primary hover:bg-primary/5"
         )}
       >
-        <Settings className="h-3.5 w-3.5" />
-        <span>Manage</span>
+        <Ellipsis className="h-4 w-4" />
       </motion.button>
 
       <AnimatePresence>
@@ -133,33 +135,78 @@ function ManageMenu({
             initial={{ opacity: 0, y: -5, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -5, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-full right-0 mt-2 w-56 bg-card border border-border/60 rounded-2xl p-2 shadow-lg z-50"
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="absolute top-full right-0 mt-2 z-50"
           >
-            <div className="flex flex-col gap-0.5">
-              {actions.map((a) => {
-                const Icon = a.icon
-                const isConfirming = confirm === a.id
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => handleAction(a.id, a.action)}
-                    className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all text-left",
-                      isConfirming
-                        ? a.id === "all"
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-primary/10 text-primary"
-                        : cn(a.color, a.bgHover)
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex-1">
-                      {isConfirming ? "タップして確定" : a.label}
-                    </span>
-                  </button>
-                )
-              })}
+            <div className="bg-card border border-border/60 rounded-2xl p-2 w-52">
+              {/* Icon tab selector */}
+              <div className="flex rounded-xl border border-border/50 bg-background/60 p-1 mb-2">
+                {MANAGE_TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = selected === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setSelected(tab.id)
+                        setConfirming(false)
+                      }}
+                      className="relative flex-1 flex items-center justify-center h-8 rounded-lg text-xs transition-colors z-10"
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="manage-tab-bg"
+                          className="absolute inset-0 bg-card border border-border/60 rounded-lg"
+                          transition={{
+                            type: "spring",
+                            bounce: 0.2,
+                            duration: 0.35,
+                          }}
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "relative z-10 flex items-center gap-1.5 transition-colors",
+                          isActive
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-medium">
+                          {tab.label}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Description + delete button */}
+              <div className="px-1 pb-1">
+                <p className="text-[10px] text-muted-foreground mb-2 px-1">
+                  {currentTab.description}
+                </p>
+                <motion.button
+                  onClick={handleDelete}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-medium transition-all",
+                    confirming
+                      ? "bg-destructive text-destructive-foreground"
+                      : selected === "all"
+                        ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                        : "bg-muted/60 text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>
+                    {confirming ? "タップして確定" : "削除する"}
+                  </span>
+                </motion.button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -230,7 +277,7 @@ export function HeaderBar({
                   <button
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-2.5 text-muted-foreground hover:text-primary transition-colors"
+                    className="absolute right-2.5 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
                     aria-label={showApiKey ? "Hide" : "Show"}
                   >
                     {showApiKey ? (
@@ -399,7 +446,7 @@ export function HeaderBar({
                       <button
                         type="button"
                         onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2.5 text-muted-foreground hover:text-primary transition-colors"
+                        className="absolute right-2.5 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
                         aria-label={showApiKey ? "Hide" : "Show"}
                       >
                         {showApiKey ? (

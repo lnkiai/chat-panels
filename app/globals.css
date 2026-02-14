@@ -123,3 +123,21 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.4);
 }
+
+/* Text shimmer animation */
+@keyframes text-shimmer {
+  0% { background-position: 100% center; }
+  100% { background-position: -100% center; }
+}
+.animate-text-shimmer {
+  animation: text-shimmer var(--shimmer-duration, 2s) ease-in-out infinite;
+}
+
+/* Skeleton pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}

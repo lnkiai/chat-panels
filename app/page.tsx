@@ -3,6 +3,7 @@
 import { HeaderBar } from "@/components/header-bar"
 import { ChatPanel } from "@/components/chat-panel"
 import { MessageInput } from "@/components/message-input"
+import { PlaygroundSkeleton } from "@/components/playground-skeleton"
 import { usePlayground } from "@/hooks/use-playground"
 
 export default function PlaygroundPage() {
@@ -28,13 +29,8 @@ export default function PlaygroundPage() {
   const isAnyPanelLoading = panels.some((p) => p.isLoading)
   const count = settings.panelCount
 
-  // Avoid hydration mismatch - show nothing until localStorage is loaded
   if (!hydrated) {
-    return (
-      <div className="flex items-center justify-center h-dvh bg-background">
-        <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    )
+    return <PlaygroundSkeleton />
   }
 
   return (
