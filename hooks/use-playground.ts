@@ -154,7 +154,6 @@ const DEFAULT_SETTINGS: PlaygroundSettings = {
   apiKey: "",
   model: "LongCat-Flash-Lite",
   panelCount: 2,
-  enableThinking: false,
 }
 
 const DEFAULT_PANELS: PanelState[] = [
@@ -248,9 +247,7 @@ export function usePlayground() {
     setSettings((prev) => ({ ...prev, model }))
   }, [])
 
-  const toggleThinking = useCallback((enabled: boolean) => {
-    setSettings((prev) => ({ ...prev, enableThinking: enabled }))
-  }, [])
+
 
   const updatePanelTitle = useCallback(
     (panelId: number, title: string) => {
@@ -374,7 +371,7 @@ export function usePlayground() {
               model: currentSettings.model,
               systemPrompt: panelSnapshot.systemPrompt,
               messages: messagesForApi,
-              enableThinking: currentSettings.enableThinking,
+              enableThinking: currentSettings.model.toLowerCase().includes("thinking"),
             }),
             signal: abortController.signal,
           })
@@ -493,7 +490,6 @@ export function usePlayground() {
     updateApiKey,
     updateModel,
     updatePanelCount,
-    toggleThinking,
     updatePanelTitle,
     updateSystemPrompt,
     clearAllChats,

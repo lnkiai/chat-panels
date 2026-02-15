@@ -23,7 +23,6 @@ export interface PlaygroundSettings {
   apiKey: string
   model: ModelId
   panelCount: number
-  enableThinking: boolean
 }
 
 export const MODELS: { id: ModelId; label: string; description: string }[] = [
@@ -43,6 +42,3 @@ export const MODELS: { id: ModelId; label: string; description: string }[] = [
     description: "Deep reasoning / Agent / 256K tokens",
   },
 ]
-
-export const isThinkingModel = (model: ModelId): boolean =>
-  model === "LongCat-Flash-Thinking-2601"

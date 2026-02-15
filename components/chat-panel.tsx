@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import {
   ChevronRight,
+  ChevronDown,
   Settings2,
   Pencil,
   Copy,
@@ -33,6 +34,46 @@ export function ChatPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(panel.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
+
+  /* Scroll tracking for "new message" button */
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
+  const prevMsgCountRef = useRef(panel.messages.length)
+
+  const checkIfAtBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    setIsAtBottom(atBottom)
+    if (atBottom) setHasNewMessages(false)
+  }, [])
+
+  // Detect new messages
+  useEffect(() => {
+    const currentCount = panel.messages.length
+    if (currentCount > prevMsgCountRef.current && !isAtBottom) {
+      setHasNewMessages(true)
+    }
+    prevMsgCountRef.current = currentCount
+  }, [panel.messages.length, isAtBottom])
+
+  // Auto-scroll to bottom when user is already at bottom
+  useEffect(() => {
+    if (isAtBottom && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [panel.messages, isAtBottom])
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+      setHasNewMessages(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -136,7 +177,11 @@ export function ChatPanel({
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto min-h-0 bg-background/40 custom-scrollbar">
+      <div
+        ref={scrollRef}
+        onScroll={checkIfAtBottom}
+        className="flex-1 overflow-y-auto min-h-0 bg-background/40 custom-scrollbar relative"
+      >
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-muted-foreground/50">
@@ -155,6 +200,32 @@ export function ChatPanel({
           </div>
         )}
       </div>
+
+      {/* New message / scroll-to-bottom button */}
+      <AnimatePresence>
+        {(!isAtBottom || hasNewMessages) && panel.messages.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="shrink-0 flex justify-center py-1"
+          >
+            <button
+              onClick={scrollToBottom}
+              className={cn(
+                "flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                hasNewMessages
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-card/90 text-muted-foreground border-border/50 hover:text-foreground"
+              )}
+            >
+              <ChevronDown className="h-3 w-3" />
+              <span>{hasNewMessages ? "新規メッセージ" : "最新へ"}</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -177,7 +248,7 @@ function MessageBubble({
 }
 
 /* ------------------------------------------------------------------ */
-/*  User bubble - right-aligned, tap to show side copy button          */
+/*  User bubble                                                        */
 /* ------------------------------------------------------------------ */
 
 function UserBubble({ content }: { content: string }) {
@@ -198,7 +269,6 @@ function UserBubble({ content }: { content: string }) {
     [content]
   )
 
-  // Close on outside click
   useEffect(() => {
     if (!showCopy) return
     const handler = (e: MouseEvent) => {
@@ -218,7 +288,6 @@ function UserBubble({ content }: { content: string }) {
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className="flex items-center justify-end gap-1.5"
     >
-      {/* Side copy button */}
       <AnimatePresence>
         {showCopy && (
           <motion.button
@@ -246,7 +315,6 @@ function UserBubble({ content }: { content: string }) {
         )}
       </AnimatePresence>
 
-      {/* Bubble */}
       <div
         onClick={() => content.trim() && setShowCopy((p) => !p)}
         className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm border border-primary/15 bg-primary/5 cursor-pointer select-text"
@@ -260,7 +328,7 @@ function UserBubble({ content }: { content: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Assistant message - full width, always-visible stats bar           */
+/*  Assistant message                                                  */
 /* ------------------------------------------------------------------ */
 
 function AssistantMessage({
@@ -277,7 +345,6 @@ function AssistantMessage({
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className="w-full"
     >
-      {/* Thinking process */}
       {message.thinking && message.thinking.length > 0 && (
         <ThinkingBlock
           thinking={message.thinking}
@@ -285,7 +352,6 @@ function AssistantMessage({
         />
       )}
 
-      {/* Content */}
       <div className="text-sm leading-relaxed">
         {message.content ? (
           <>
@@ -309,7 +375,6 @@ function AssistantMessage({
         ) : null}
       </div>
 
-      {/* Always-visible stats bar below AI content */}
       {message.content.trim() && !message.isStreaming && (
         <AssistantStatsBar content={message.content} />
       )}
@@ -318,7 +383,7 @@ function AssistantMessage({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Assistant stats bar - always visible below AI message              */
+/*  Assistant stats bar                                                */
 /* ------------------------------------------------------------------ */
 
 function AssistantStatsBar({ content }: { content: string }) {
@@ -427,7 +492,7 @@ function PromptStatsBar({ content }: { content: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Thinking block                                                     */
+/*  Thinking block - defaults CLOSED, opens only during streaming      */
 /* ------------------------------------------------------------------ */
 
 function ThinkingBlock({
@@ -437,11 +502,16 @@ function ThinkingBlock({
   thinking: string
   isStreaming: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(true)
-  const wasStreamingRef = useRef(isStreaming)
+  // Default to false (closed). Only auto-open when streaming starts.
+  const [isOpen, setIsOpen] = useState(false)
+  const wasStreamingRef = useRef(false)
 
   useEffect(() => {
-    // When streaming stops (was true -> now false), auto-collapse
+    // When streaming starts (was false -> now true), auto-open
+    if (!wasStreamingRef.current && isStreaming) {
+      setIsOpen(true)
+    }
+    // When streaming stops (was true -> now false), auto-close
     if (wasStreamingRef.current && !isStreaming) {
       setIsOpen(false)
     }
