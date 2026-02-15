@@ -23,12 +23,14 @@ interface ChatPanelProps {
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
   onUpdateTitle: (title: string) => void
+  isMobileFullscreen?: boolean
 }
 
 export function ChatPanel({
   panel,
   onUpdateSystemPrompt,
   onUpdateTitle,
+  isMobileFullscreen,
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -93,8 +95,16 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-w-0 bg-card rounded-2xl border border-border/60 overflow-hidden">
-      {/* Panel header */}
+    <div
+      className={cn(
+        "flex flex-col h-full min-w-0 overflow-hidden",
+        isMobileFullscreen
+          ? "bg-background rounded-none border-none"
+          : "bg-card rounded-2xl border border-border/60"
+      )}
+    >
+      {/* Panel header - hidden on mobile fullscreen (system prompt is in input bar) */}
+      {isMobileFullscreen ? null : (
       <div className="shrink-0">
         <div className="flex items-center w-full px-3.5 py-2.5">
           <motion.button
@@ -175,12 +185,16 @@ export function ChatPanel({
 
         <div className="h-px bg-border/40 mx-3" />
       </div>
+      )}
 
       {/* Messages area */}
       <div
         ref={scrollRef}
         onScroll={checkIfAtBottom}
-        className="flex-1 overflow-y-auto min-h-0 bg-background/40 custom-scrollbar relative"
+        className={cn(
+          "flex-1 overflow-y-auto min-h-0 custom-scrollbar relative",
+          isMobileFullscreen ? "bg-background" : "bg-background/40"
+        )}
       >
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -189,7 +203,10 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="px-3 py-3 flex flex-col gap-3">
+          <div className={cn(
+            "px-3 flex flex-col gap-3",
+            isMobileFullscreen ? "pt-16 pb-8" : "py-3"
+          )}>
             {panel.messages.map((message, i) => (
               <MessageBubble
                 key={message.id}

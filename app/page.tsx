@@ -35,7 +35,6 @@ export default function PlaygroundPage() {
   /* ---- Mobile swipe state ---- */
   const [mobileIndex, setMobileIndex] = useState(0)
 
-  // Clamp mobileIndex when panel count changes
   useEffect(() => {
     if (mobileIndex >= count) setMobileIndex(Math.max(0, count - 1))
   }, [count, mobileIndex])
@@ -46,7 +45,7 @@ export default function PlaygroundPage() {
   )
   const goMobileNext = useCallback(
     () => setMobileIndex((i) => Math.min(count - 1, i + 1)),
-    []
+    [count]
   )
 
   if (!hydrated) {
@@ -69,8 +68,9 @@ export default function PlaygroundPage() {
       />
 
       {/* ============ MOBILE ============ */}
-      <main className="flex-1 min-h-0 flex flex-col md:hidden">
-        {/* Full-screen swipe panel */}
+      {/* Full-screen panels behind header & input */}
+      <div className="flex-1 min-h-0 flex flex-col md:hidden relative">
+        {/* Panel area - takes all space */}
         <div className="flex-1 min-h-0 relative">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -79,7 +79,7 @@ export default function PlaygroundPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -60 }}
               transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="absolute inset-0 px-3 pt-2 pb-1"
+              className="absolute inset-0"
             >
               {currentMobilePanel && (
                 <ChatPanel
@@ -92,53 +92,53 @@ export default function PlaygroundPage() {
                   onUpdateTitle={(title) =>
                     updatePanelTitle(currentMobilePanel.id, title)
                   }
+                  isMobileFullscreen
                 />
               )}
             </motion.div>
           </AnimatePresence>
-        </div>
 
-        {/* Mobile nav bar above input */}
-        {count > 1 && (
-          <div className="shrink-0 flex items-center justify-center gap-3 px-4 pt-1 pb-0.5">
-            <motion.button
-              onClick={goMobilePrev}
-              disabled={mobileIndex === 0}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.85 }}
-              className="h-7 w-7 flex items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </motion.button>
+          {/* Floating nav arrows + dots overlay at bottom of panel */}
+          {count > 1 && (
+            <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-3 z-20 pointer-events-none">
+              <motion.button
+                onClick={goMobilePrev}
+                disabled={mobileIndex === 0}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.85 }}
+                className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </motion.button>
 
-            {/* Dots indicator */}
-            <div className="flex items-center gap-1.5">
-              {panels.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setMobileIndex(idx)}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all",
-                    idx === mobileIndex
-                      ? "w-5 bg-primary"
-                      : "w-1.5 bg-border hover:bg-muted-foreground/40"
-                  )}
-                />
-              ))}
+              <div className="pointer-events-auto flex items-center gap-1.5">
+                {panels.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setMobileIndex(idx)}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all",
+                      idx === mobileIndex
+                        ? "w-5 bg-primary"
+                        : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                    )}
+                  />
+                ))}
+              </div>
+
+              <motion.button
+                onClick={goMobileNext}
+                disabled={mobileIndex >= count - 1}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.85 }}
+                className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </motion.button>
             </div>
-
-            <motion.button
-              onClick={goMobileNext}
-              disabled={mobileIndex >= count - 1}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.85 }}
-              className="h-7 w-7 flex items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </motion.button>
-          </div>
-        )}
-      </main>
+          )}
+        </div>
+      </div>
 
       {/* ============ DESKTOP ============ */}
       <main className="flex-1 min-h-0 hidden md:block p-4 pt-3">
@@ -146,11 +146,8 @@ export default function PlaygroundPage() {
           <div
             className="flex h-full gap-4"
             style={{
-              // Each panel is 50% of container width (2 visible), min 380px
               width:
-                count <= 2
-                  ? "100%"
-                  : `max(100%, ${count * 380}px)`,
+                count <= 2 ? "100%" : `max(100%, ${count * 380}px)`,
             }}
           >
             {panels.map((panel, idx) => (
@@ -158,7 +155,7 @@ export default function PlaygroundPage() {
                 key={panel.id}
                 className="h-full min-w-0"
                 style={{
-                  flexBasis: count <= 2 ? `${100 / count}%` : `${100 / count}%`,
+                  flexBasis: `${100 / count}%`,
                   flexGrow: 1,
                   flexShrink: 0,
                   minWidth: "340px",
@@ -190,6 +187,13 @@ export default function PlaygroundPage() {
         onUpdateModel={updateModel}
         draft={draft}
         setDraft={setDraft}
+        mobilePanel={currentMobilePanel}
+        onUpdateMobileSystemPrompt={
+          currentMobilePanel
+            ? (prompt: string) =>
+                updateSystemPrompt(currentMobilePanel.id, prompt)
+            : undefined
+        }
       />
     </div>
   )
