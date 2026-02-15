@@ -34,6 +34,7 @@ export default function PlaygroundPage() {
 
   /* ---- Mobile swipe via CSS scroll-snap ---- */
   const [mobileIndex, setMobileIndex] = useState(0)
+  const [mobilePromptOpen, setMobilePromptOpen] = useState(false)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,8 +48,9 @@ export default function PlaygroundPage() {
     const w = el.clientWidth
     if (w === 0) return
     const idx = Math.round(el.scrollLeft / w)
+    if (idx !== mobileIndex) setMobilePromptOpen(false)
     setMobileIndex(idx)
-  }, [])
+  }, [mobileIndex])
 
   const scrollToPanel = useCallback(
     (idx: number) => {
@@ -87,6 +89,19 @@ export default function PlaygroundPage() {
         onClearApiKey={clearApiKey}
         onResetPrompts={resetSystemPrompts}
         onClearEverything={clearEverything}
+        mobilePromptOpen={mobilePromptOpen}
+        setMobilePromptOpen={setMobilePromptOpen}
+        mobilePanel={currentMobilePanel}
+        onUpdateMobileSystemPrompt={
+          currentMobilePanel
+            ? (prompt: string) => updateSystemPrompt(currentMobilePanel.id, prompt)
+            : undefined
+        }
+        onUpdateMobileTitle={
+          currentMobilePanel
+            ? (title: string) => updatePanelTitle(currentMobilePanel.id, title)
+            : undefined
+        }
       />
 
       {/* ============ MOBILE ============ */}
@@ -222,6 +237,8 @@ export default function PlaygroundPage() {
                 updatePanelTitle(currentMobilePanel.id, title)
             : undefined
         }
+        mobilePromptOpen={mobilePromptOpen}
+        setMobilePromptOpen={setMobilePromptOpen}
       />
     </div>
   )

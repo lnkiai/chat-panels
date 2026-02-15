@@ -9,13 +9,18 @@ import {
   ClockFading,
   Minus,
   Plus,
+  Pencil,
+  Copy,
+  Check,
+  Type,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { PlaygroundSettings } from "@/lib/types"
+import { Textarea } from "@/components/ui/textarea"
+import type { PlaygroundSettings, PanelState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface HeaderBarProps {
@@ -26,6 +31,11 @@ interface HeaderBarProps {
   onClearApiKey: () => void
   onResetPrompts: () => void
   onClearEverything: () => void
+  mobilePromptOpen?: boolean
+  setMobilePromptOpen?: (open: boolean) => void
+  mobilePanel?: PanelState
+  onUpdateMobileSystemPrompt?: (prompt: string) => void
+  onUpdateMobileTitle?: (title: string) => void
 }
 
 /* ------------------------------------------------------------------ */
@@ -213,13 +223,41 @@ export function HeaderBar({
   onClearApiKey,
   onResetPrompts,
   onClearEverything,
+  mobilePromptOpen = false,
+  setMobilePromptOpen,
+  mobilePanel,
+  onUpdateMobileSystemPrompt,
+  onUpdateMobileTitle,
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  // Mobile manage panel (same slide-down style as settings)
   const [mobileManageOpen, setMobileManageOpen] = useState(false)
   const [manageSelected, setManageSelected] = useState<ManageTabId>("chats")
   const [manageConfirming, setManageConfirming] = useState(false)
+  const [isEditingPromptTitle, setIsEditingPromptTitle] = useState(false)
+  const [promptTitleDraft, setPromptTitleDraft] = useState(mobilePanel?.title ?? "")
+  const [promptCopied, setPromptCopied] = useState(false)
+  const promptTitleInputRef = useRef<HTMLInputElement>(null)
+
+  const commitPromptTitle = () => {
+    const trimmed = promptTitleDraft.trim()
+    if (trimmed && onUpdateMobileTitle) {
+      onUpdateMobileTitle(trimmed)
+    } else {
+      setPromptTitleDraft(mobilePanel?.title ?? "")
+    }
+    setIsEditingPromptTitle(false)
+  }
+
+  const handleCopyPrompt = () => {
+    if (!mobilePanel?.systemPrompt.trim()) return
+    navigator.clipboard.writeText(mobilePanel.systemPrompt)
+    setPromptCopied(true)
+    setTimeout(() => setPromptCopied(false), 2000)
+  }
+
+  const promptCharCount = mobilePanel?.systemPrompt.length ?? 0
+  const promptTokenEstimate = Math.ceil(promptCharCount / 3)
 
   const handleMobileDelete = () => {
     if (!manageConfirming) {
@@ -301,7 +339,7 @@ export function HeaderBar({
           <div className="flex items-center gap-0.5">
             {/* Manage button */}
             <motion.button
-              onClick={() => { setMobileManageOpen(!mobileManageOpen); setMobileMenuOpen(false); setManageConfirming(false) }}
+              onClick={() => { setMobileManageOpen(!mobileManageOpen); setMobileMenuOpen(false); setMobilePromptOpen?.(false); setManageConfirming(false) }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.85 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -314,7 +352,7 @@ export function HeaderBar({
             </motion.button>
             {/* Settings button */}
             <motion.button
-              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setMobileManageOpen(false) }}
+              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setMobileManageOpen(false); setMobilePromptOpen?.(false) }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.85 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -429,6 +467,105 @@ export function HeaderBar({
                   <Trash2 className="h-3 w-3" />
                   <span>{manageConfirming ? "タップして確定" : "削除する"}</span>
                 </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile: System prompt slide-down (same pattern as settings/manage) */}
+        <AnimatePresence>
+          {mobilePromptOpen && mobilePanel && onUpdateMobileSystemPrompt && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="md:hidden overflow-hidden border-t border-border/40"
+            >
+              <div className="px-4 py-3 space-y-2.5">
+                {/* Title row */}
+                <div className="flex items-center">
+                  {isEditingPromptTitle ? (
+                    <input
+                      ref={promptTitleInputRef}
+                      value={promptTitleDraft}
+                      onChange={(e) => setPromptTitleDraft(e.target.value)}
+                      onBlur={commitPromptTitle}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitPromptTitle()
+                        if (e.key === "Escape") {
+                          setPromptTitleDraft(mobilePanel.title)
+                          setIsEditingPromptTitle(false)
+                        }
+                      }}
+                      className="text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-32 text-foreground"
+                      maxLength={30}
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setPromptTitleDraft(mobilePanel.title)
+                        setIsEditingPromptTitle(true)
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-heading text-foreground hover:text-primary transition-colors group"
+                    >
+                      <span>{mobilePanel.title}</span>
+                      <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setMobilePromptOpen?.(false)}
+                    className="ml-auto text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+
+                {/* Textarea */}
+                <Textarea
+                  value={mobilePanel.systemPrompt}
+                  onChange={(e) => onUpdateMobileSystemPrompt(e.target.value)}
+                  className="text-xs min-h-[72px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
+                  placeholder="System prompt..."
+                  rows={3}
+                />
+
+                {/* Stats bar */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopyPrompt}
+                    className={cn(
+                      "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
+                      promptCopied
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    {promptCopied ? (
+                      <>
+                        <Check className="h-2.5 w-2.5" />
+                        <span>{"Copied"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-2.5 w-2.5" />
+                        <span>{"Copy"}</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="h-3 w-px bg-border/40" />
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
+                    <span className="flex items-center gap-0.5">
+                      <Type className="h-2.5 w-2.5" />
+                      {promptCharCount.toLocaleString()} {"chars"}
+                    </span>
+                    <span>
+                      {"~"}{promptTokenEstimate.toLocaleString()} {"tokens"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

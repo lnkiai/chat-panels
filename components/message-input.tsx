@@ -6,12 +6,8 @@ import {
   ChevronDown,
   Check,
   Settings2,
-  Pencil,
-  Copy,
-  Type,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Textarea } from "@/components/ui/textarea"
 import type { ModelId, PanelState } from "@/lib/types"
 import { MODELS } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -27,6 +23,8 @@ interface MessageInputProps {
   mobilePanel?: PanelState
   onUpdateMobileSystemPrompt?: (prompt: string) => void
   onUpdateMobileTitle?: (title: string) => void
+  mobilePromptOpen?: boolean
+  setMobilePromptOpen?: (open: boolean) => void
 }
 
 export function MessageInput({
@@ -40,16 +38,13 @@ export function MessageInput({
   mobilePanel,
   onUpdateMobileSystemPrompt,
   onUpdateMobileTitle,
+  mobilePromptOpen = false,
+  setMobilePromptOpen,
 }: MessageInputProps) {
   const value = draft
   const setValue = setDraft
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
-  const [mobilePromptOpen, setMobilePromptOpen] = useState(false)
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [titleDraft, setTitleDraft] = useState(mobilePanel?.title ?? "")
-  const [copied, setCopied] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const titleInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim()
@@ -81,131 +76,11 @@ export function MessageInput({
     }
   }
 
-  const commitTitle = () => {
-    const trimmed = titleDraft.trim()
-    if (trimmed && onUpdateMobileTitle) {
-      onUpdateMobileTitle(trimmed)
-    } else {
-      setTitleDraft(mobilePanel?.title ?? "")
-    }
-    setIsEditingTitle(false)
-  }
-
-  const handleCopyPrompt = useCallback(() => {
-    if (!mobilePanel?.systemPrompt.trim()) return
-    navigator.clipboard.writeText(mobilePanel.systemPrompt)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [mobilePanel?.systemPrompt])
-
   const currentModel = MODELS.find((m) => m.id === model)
-  const charCount = mobilePanel?.systemPrompt.length ?? 0
-  const tokenEstimate = Math.ceil(charCount / 3)
 
   return (
     <footer className="border-none shrink-0 relative z-20 bg-gradient-to-t from-background via-background/90 to-transparent md:bg-transparent">
-      {/* Mobile system prompt editor - slides down like header settings */}
-      <AnimatePresence>
-        {mobilePromptOpen && mobilePanel && onUpdateMobileSystemPrompt && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            className="md:hidden overflow-hidden"
-          >
-            <div className="mx-4 mb-2 bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl overflow-hidden">
-              {/* Title row */}
-              <div className="flex items-center px-3.5 py-2.5">
-                <Settings2 className="h-3 w-3 text-muted-foreground shrink-0" />
-
-                {isEditingTitle ? (
-                  <input
-                    ref={titleInputRef}
-                    value={titleDraft}
-                    onChange={(e) => setTitleDraft(e.target.value)}
-                    onBlur={commitTitle}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitTitle()
-                      if (e.key === "Escape") {
-                        setTitleDraft(mobilePanel.title)
-                        setIsEditingTitle(false)
-                      }
-                    }}
-                    className="ml-2 text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-32 text-foreground"
-                    maxLength={30}
-                    autoFocus
-                  />
-                ) : (
-                  <button
-                    onClick={() => {
-                      setTitleDraft(mobilePanel.title)
-                      setIsEditingTitle(true)
-                    }}
-                    className="ml-2 flex items-center gap-1 text-xs font-heading text-foreground hover:text-primary transition-colors group"
-                  >
-                    <span>{mobilePanel.title}</span>
-                    <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setMobilePromptOpen(false)}
-                  className="ml-auto text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-
-              {/* Textarea */}
-              <div className="px-3.5 pb-2.5">
-                <Textarea
-                  value={mobilePanel.systemPrompt}
-                  onChange={(e) => onUpdateMobileSystemPrompt(e.target.value)}
-                  className="text-xs min-h-[72px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
-                  placeholder="System prompt..."
-                  rows={3}
-                />
-              </div>
-
-              {/* Stats bar */}
-              <div className="flex items-center gap-2 px-4 pb-2.5">
-                <button
-                  onClick={handleCopyPrompt}
-                  className={cn(
-                    "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
-                    copied
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
-                  )}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-2.5 w-2.5" />
-                      <span>{"Copied"}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-2.5 w-2.5" />
-                      <span>{"Copy"}</span>
-                    </>
-                  )}
-                </button>
-                <div className="h-3 w-px bg-border/40" />
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
-                  <span className="flex items-center gap-0.5">
-                    <Type className="h-2.5 w-2.5" />
-                    {charCount.toLocaleString()} {"chars"}
-                  </span>
-                  <span>
-                    {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mobile system prompt editor is rendered via header - see page.tsx */}
 
       <div className="px-4 pt-6 pb-4 md:pt-2 max-w-3xl mx-auto">
         {/* Capsule input container */}
@@ -335,7 +210,7 @@ export function MessageInput({
               </div>
 
               {/* Mobile: system prompt button - no chevron, just icon + title */}
-              {mobilePanel && onUpdateMobileSystemPrompt && (
+              {mobilePanel && setMobilePromptOpen && (
                 <motion.button
                   type="button"
                   onClick={() => setMobilePromptOpen(!mobilePromptOpen)}

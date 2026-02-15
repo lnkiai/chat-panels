@@ -205,7 +205,7 @@ export function ChatPanel({
         ) : (
           <div className={cn(
             "px-3 flex flex-col gap-3",
-            isMobileFullscreen ? "pt-16 pb-40" : "py-3"
+            isMobileFullscreen ? "pt-20 pb-48" : "py-3"
           )}>
             {panel.messages.map((message, i) => (
               <MessageBubble
@@ -229,7 +229,7 @@ export function ChatPanel({
             className={cn(
               "flex justify-center pointer-events-none",
               isMobileFullscreen
-                ? "absolute left-0 right-0 bottom-44 z-30"
+                ? "absolute left-0 right-0 bottom-52 z-30"
                 : "shrink-0 py-1"
             )}
           >
