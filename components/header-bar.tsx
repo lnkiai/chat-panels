@@ -29,7 +29,7 @@ interface HeaderBarProps {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Manage Menu                                                        */
+/*  Manage Tabs definition                                             */
 /* ------------------------------------------------------------------ */
 
 const MANAGE_TABS = [
@@ -40,18 +40,19 @@ const MANAGE_TABS = [
 
 type ManageTabId = (typeof MANAGE_TABS)[number]["id"]
 
-interface ManageMenuProps {
-  onClearChats: () => void
-  onClearApiKey: () => void
-  onResetPrompts: () => void
-  onClearEverything: () => void
-}
+/* ------------------------------------------------------------------ */
+/*  Desktop Manage Menu (floating dropdown)                            */
+/* ------------------------------------------------------------------ */
 
-function ManageMenu({
+function DesktopManageMenu({
   onClearChats,
   onClearApiKey,
   onClearEverything,
-}: ManageMenuProps) {
+}: {
+  onClearChats: () => void
+  onClearApiKey: () => void
+  onClearEverything: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<ManageTabId>("chats")
   const [confirming, setConfirming] = useState(false)
@@ -86,10 +87,7 @@ function ManageMenu({
   return (
     <div className="relative" ref={menuRef}>
       <motion.button
-        onClick={() => {
-          setOpen(!open)
-          setConfirming(false)
-        }}
+        onClick={() => { setOpen(!open); setConfirming(false) }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
         transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -119,38 +117,26 @@ function ManageMenu({
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => {
-                        setSelected(tab.id)
-                        setConfirming(false)
-                      }}
+                      onClick={() => { setSelected(tab.id); setConfirming(false) }}
                       className="relative flex-1 flex items-center justify-center h-8 rounded-lg text-xs transition-colors z-10"
                     >
                       {isActive && (
                         <motion.div
-                          layoutId="manage-tab-bg"
+                          layoutId="manage-tab-bg-desktop"
                           className="absolute inset-0 bg-card border border-border/60 rounded-lg"
-                          transition={{
-                            type: "spring",
-                            bounce: 0.2,
-                            duration: 0.35,
-                          }}
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
                         />
                       )}
-                      <span
-                        className={cn(
-                          "relative z-10 text-[11px] font-medium transition-colors",
-                          isActive
-                            ? "text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
+                      <span className={cn(
+                        "relative z-10 text-[11px] font-medium transition-colors",
+                        isActive ? "text-foreground" : "text-muted-foreground"
+                      )}>
                         {tab.label}
                       </span>
                     </button>
                   )
                 })}
               </div>
-
               <div className="px-1 pb-1">
                 <p className="text-[10px] text-muted-foreground mb-2 px-1">
                   {currentTab.description}
@@ -170,9 +156,7 @@ function ManageMenu({
                   )}
                 >
                   <Trash2 className="h-3 w-3" />
-                  <span>
-                    {confirming ? "タップして確定" : "削除する"}
-                  </span>
+                  <span>{confirming ? "タップして確定" : "削除する"}</span>
                 </motion.button>
               </div>
             </div>
@@ -184,16 +168,10 @@ function ManageMenu({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Panel Count Stepper: [ - ] 3 [ + ]                                 */
+/*  Panel Count Stepper                                                */
 /* ------------------------------------------------------------------ */
 
-function PanelStepper({
-  count,
-  onChange,
-}: {
-  count: number
-  onChange: (n: number) => void
-}) {
+function PanelStepper({ count, onChange }: { count: number; onChange: (n: number) => void }) {
   return (
     <div className="flex items-center gap-1">
       <motion.button
@@ -238,36 +216,42 @@ export function HeaderBar({
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Mobile manage panel (same slide-down style as settings)
+  const [mobileManageOpen, setMobileManageOpen] = useState(false)
+  const [manageSelected, setManageSelected] = useState<ManageTabId>("chats")
+  const [manageConfirming, setManageConfirming] = useState(false)
+
+  const handleMobileDelete = () => {
+    if (!manageConfirming) {
+      setManageConfirming(true)
+      return
+    }
+    if (manageSelected === "chats") onClearChats()
+    else if (manageSelected === "apikey") onClearApiKey()
+    else onClearEverything()
+    setMobileManageOpen(false)
+    setManageConfirming(false)
+  }
+
+  const manageCurrentTab = MANAGE_TABS.find((t) => t.id === manageSelected)!
 
   return (
     <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4 md:pb-0 z-30 relative">
       <header className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl">
         {/* Desktop layout */}
         <div className="hidden md:flex items-center justify-between px-5 h-14">
-          {/* Left: Logo */}
           <div className="flex items-center shrink-0">
             <div className="h-7 w-7 rounded-xl bg-card flex items-center justify-center mr-2.5 border border-border/60 overflow-hidden">
-              <Image
-                src="/images/longcat-color.svg"
-                alt="Longcat"
-                width={20}
-                height={20}
-                className="h-5 w-5"
-              />
+              <Image src="/images/longcat-color.svg" alt="Longcat" width={20} height={20} className="h-5 w-5" />
             </div>
             <h1 className="text-sm font-heading tracking-tight text-foreground">
               Longcat AI Playground
             </h1>
           </div>
 
-          {/* Center: Controls */}
           <div className="flex items-center gap-4">
-            {/* API Key */}
             <div className="flex items-center gap-2">
-              <Label
-                htmlFor="api-key-desktop"
-                className="text-xs text-muted-foreground shrink-0"
-              >
+              <Label htmlFor="api-key-desktop" className="text-xs text-muted-foreground shrink-0">
                 API Key
               </Label>
               <div className="relative flex items-center">
@@ -283,35 +267,22 @@ export function HeaderBar({
                   type="button"
                   onClick={() => setShowApiKey(!showApiKey)}
                   className="absolute right-2.5 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
-                  aria-label={showApiKey ? "Hide" : "Show"}
                 >
-                  {showApiKey ? (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
+                  {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>
               </div>
             </div>
-
             <div className="h-5 w-px bg-border/50" />
-
-            {/* Panel Count - Stepper */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Panels</span>
-              <PanelStepper
-                count={settings.panelCount}
-                onChange={onUpdatePanelCount}
-              />
+              <PanelStepper count={settings.panelCount} onChange={onUpdatePanelCount} />
             </div>
           </div>
 
-          {/* Right: Manage menu */}
           <div className="shrink-0">
-            <ManageMenu
+            <DesktopManageMenu
               onClearChats={onClearChats}
               onClearApiKey={onClearApiKey}
-              onResetPrompts={onResetPrompts}
               onClearEverything={onClearEverything}
             />
           </div>
@@ -321,48 +292,43 @@ export function HeaderBar({
         <div className="flex md:hidden items-center justify-between px-3 h-12">
           <div className="flex items-center">
             <div className="h-6 w-6 rounded-lg bg-card flex items-center justify-center mr-2 border border-border/60 overflow-hidden">
-              <Image
-                src="/images/longcat-color.svg"
-                alt="Longcat"
-                width={16}
-                height={16}
-                className="h-4 w-4"
-              />
+              <Image src="/images/longcat-color.svg" alt="Longcat" width={16} height={16} className="h-4 w-4" />
             </div>
             <h1 className="text-sm font-heading tracking-tight text-foreground">
               Longcat AI
             </h1>
           </div>
           <div className="flex items-center gap-0.5">
-            <ManageMenu
-              onClearChats={onClearChats}
-              onClearApiKey={onClearApiKey}
-              onResetPrompts={onResetPrompts}
-              onClearEverything={onClearEverything}
-            />
+            {/* Manage button */}
             <motion.button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => { setMobileManageOpen(!mobileManageOpen); setMobileMenuOpen(false); setManageConfirming(false) }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.85 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
               className={cn(
                 "h-8 w-8 flex items-center justify-center rounded-xl transition-colors",
-                mobileMenuOpen
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-primary"
+                mobileManageOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
               )}
             >
-              {mobileMenuOpen ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <Settings className="h-4 w-4" />
+              <ClockFading className="h-4 w-4" />
+            </motion.button>
+            {/* Settings button */}
+            <motion.button
+              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setMobileManageOpen(false) }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              className={cn(
+                "h-8 w-8 flex items-center justify-center rounded-xl transition-colors",
+                mobileMenuOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
               )}
-              <span className="sr-only">Settings</span>
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
             </motion.button>
           </div>
         </div>
 
-        {/* Mobile dropdown panel */}
+        {/* Mobile: Settings slide-down */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -373,12 +339,8 @@ export function HeaderBar({
               className="md:hidden overflow-hidden border-t border-border/40"
             >
               <div className="px-4 py-3 space-y-3">
-                {/* API Key */}
                 <div className="space-y-1.5">
-                  <Label
-                    htmlFor="api-key-mobile"
-                    className="text-xs text-muted-foreground"
-                  >
+                  <Label htmlFor="api-key-mobile" className="text-xs text-muted-foreground">
                     API Key
                   </Label>
                   <div className="relative flex items-center">
@@ -394,25 +356,79 @@ export function HeaderBar({
                       type="button"
                       onClick={() => setShowApiKey(!showApiKey)}
                       className="absolute right-2.5 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
-                      aria-label={showApiKey ? "Hide" : "Show"}
                     >
-                      {showApiKey ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
+                      {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                 </div>
-
-                {/* Panel count */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Panels</span>
-                  <PanelStepper
-                    count={settings.panelCount}
-                    onChange={onUpdatePanelCount}
-                  />
+                  <PanelStepper count={settings.panelCount} onChange={onUpdatePanelCount} />
                 </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile: Manage slide-down (same pattern as settings) */}
+        <AnimatePresence>
+          {mobileManageOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="md:hidden overflow-hidden border-t border-border/40"
+            >
+              <div className="px-4 py-3">
+                {/* Tab selector */}
+                <div className="flex rounded-xl border border-border/50 bg-background/60 p-1 mb-3">
+                  {MANAGE_TABS.map((tab) => {
+                    const isActive = manageSelected === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => { setManageSelected(tab.id); setManageConfirming(false) }}
+                        className="relative flex-1 flex items-center justify-center h-8 rounded-lg text-xs transition-colors z-10"
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="manage-tab-bg-mobile"
+                            className="absolute inset-0 bg-card border border-border/60 rounded-lg"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+                          />
+                        )}
+                        <span className={cn(
+                          "relative z-10 text-[11px] font-medium transition-colors",
+                          isActive ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          {tab.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <p className="text-[10px] text-muted-foreground mb-2 px-1">
+                  {manageCurrentTab.description}
+                </p>
+                <motion.button
+                  onClick={handleMobileDelete}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-medium transition-all",
+                    manageConfirming
+                      ? "bg-destructive text-destructive-foreground"
+                      : manageSelected === "all"
+                        ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                        : "bg-muted/60 text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>{manageConfirming ? "タップして確定" : "削除する"}</span>
+                </motion.button>
               </div>
             </motion.div>
           )}

@@ -124,6 +124,15 @@
   background-color: hsl(var(--muted-foreground) / 0.4);
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Text shimmer animation */
 @keyframes text-shimmer {
   0% { background-position: 100% center; }

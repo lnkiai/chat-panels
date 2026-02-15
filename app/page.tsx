@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { HeaderBar } from "@/components/header-bar"
 import { ChatPanel } from "@/components/chat-panel"
 import { MessageInput } from "@/components/message-input"
@@ -32,20 +32,42 @@ export default function PlaygroundPage() {
   const isAnyPanelLoading = panels.some((p) => p.isLoading)
   const count = settings.panelCount
 
-  /* ---- Mobile swipe state ---- */
+  /* ---- Mobile swipe via CSS scroll-snap ---- */
   const [mobileIndex, setMobileIndex] = useState(0)
+  const mobileScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (mobileIndex >= count) setMobileIndex(Math.max(0, count - 1))
   }, [count, mobileIndex])
 
+  // Track scroll-snap position
+  const handleMobileScroll = useCallback(() => {
+    const el = mobileScrollRef.current
+    if (!el) return
+    const w = el.clientWidth
+    if (w === 0) return
+    const idx = Math.round(el.scrollLeft / w)
+    setMobileIndex(idx)
+  }, [])
+
+  const scrollToPanel = useCallback(
+    (idx: number) => {
+      const el = mobileScrollRef.current
+      if (!el) return
+      const clamped = Math.max(0, Math.min(count - 1, idx))
+      el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" })
+      setMobileIndex(clamped)
+    },
+    [count]
+  )
+
   const goMobilePrev = useCallback(
-    () => setMobileIndex((i) => Math.max(0, i - 1)),
-    []
+    () => scrollToPanel(mobileIndex - 1),
+    [scrollToPanel, mobileIndex]
   )
   const goMobileNext = useCallback(
-    () => setMobileIndex((i) => Math.min(count - 1, i + 1)),
-    [count]
+    () => scrollToPanel(mobileIndex + 1),
+    [scrollToPanel, mobileIndex]
   )
 
   if (!hydrated) {
@@ -55,7 +77,7 @@ export default function PlaygroundPage() {
   const currentMobilePanel = panels[mobileIndex]
 
   return (
-    <div className="flex flex-col h-dvh bg-background">
+    <div className="flex flex-col h-dvh bg-background overflow-hidden">
       {/* Floating Header */}
       <HeaderBar
         settings={settings}
@@ -68,76 +90,73 @@ export default function PlaygroundPage() {
       />
 
       {/* ============ MOBILE ============ */}
-      {/* Full-screen panels behind header & input */}
       <div className="flex-1 min-h-0 flex flex-col md:hidden relative">
-        {/* Panel area - takes all space */}
-        <div className="flex-1 min-h-0 relative">
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.div
-              key={mobileIndex}
-              initial={{ opacity: 0, x: 60 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -60 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="absolute inset-0"
+        {/* Scroll-snap container - full screen panels */}
+        <div
+          ref={mobileScrollRef}
+          onScroll={handleMobileScroll}
+          className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar"
+        >
+          {panels.map((panel, idx) => (
+            <div
+              key={panel.id}
+              className="w-full h-full shrink-0 snap-center snap-always"
             >
-              {currentMobilePanel && (
-                <ChatPanel
-                  panel={currentMobilePanel}
-                  panelIndex={mobileIndex}
-                  totalPanels={count}
-                  onUpdateSystemPrompt={(prompt) =>
-                    updateSystemPrompt(currentMobilePanel.id, prompt)
-                  }
-                  onUpdateTitle={(title) =>
-                    updatePanelTitle(currentMobilePanel.id, title)
-                  }
-                  isMobileFullscreen
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Floating nav arrows + dots overlay at bottom of panel */}
-          {count > 1 && (
-            <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-3 z-20 pointer-events-none">
-              <motion.button
-                onClick={goMobilePrev}
-                disabled={mobileIndex === 0}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.85 }}
-                className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </motion.button>
-
-              <div className="pointer-events-auto flex items-center gap-1.5">
-                {panels.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setMobileIndex(idx)}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all",
-                      idx === mobileIndex
-                        ? "w-5 bg-primary"
-                        : "w-1.5 bg-border hover:bg-muted-foreground/40"
-                    )}
-                  />
-                ))}
-              </div>
-
-              <motion.button
-                onClick={goMobileNext}
-                disabled={mobileIndex >= count - 1}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.85 }}
-                className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </motion.button>
+              <ChatPanel
+                panel={panel}
+                panelIndex={idx}
+                totalPanels={count}
+                onUpdateSystemPrompt={(prompt) =>
+                  updateSystemPrompt(panel.id, prompt)
+                }
+                onUpdateTitle={(title) =>
+                  updatePanelTitle(panel.id, title)
+                }
+                isMobileFullscreen
+              />
             </div>
-          )}
+          ))}
         </div>
+
+        {/* Floating nav arrows + dots */}
+        {count > 1 && (
+          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3 z-20 pointer-events-none">
+            <motion.button
+              onClick={goMobilePrev}
+              disabled={mobileIndex === 0}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.85 }}
+              className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </motion.button>
+
+            <div className="pointer-events-auto flex items-center gap-1.5">
+              {panels.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => scrollToPanel(idx)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    idx === mobileIndex
+                      ? "w-5 bg-primary"
+                      : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                  )}
+                />
+              ))}
+            </div>
+
+            <motion.button
+              onClick={goMobileNext}
+              disabled={mobileIndex >= count - 1}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.85 }}
+              className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </motion.button>
+          </div>
+        )}
       </div>
 
       {/* ============ DESKTOP ============ */}
@@ -192,6 +211,12 @@ export default function PlaygroundPage() {
           currentMobilePanel
             ? (prompt: string) =>
                 updateSystemPrompt(currentMobilePanel.id, prompt)
+            : undefined
+        }
+        onUpdateMobileTitle={
+          currentMobilePanel
+            ? (title: string) =>
+                updatePanelTitle(currentMobilePanel.id, title)
             : undefined
         }
       />
