@@ -13,10 +13,13 @@ import {
   Copy,
   Check,
   Type,
-  PanelLeft,
   AtSign,
+  BookmarkPlus,
+  FileText,
+  MoreHorizontal,
 } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
@@ -24,6 +27,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { PlaygroundSettings, PanelState, PromptTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+interface TemplateStore {
+  templates: PromptTemplate[]
+  addTemplate: (name: string, content: string) => PromptTemplate
+  updateTemplate: (id: string, updates: Partial<Pick<PromptTemplate, "name" | "content">>) => void
+  deleteTemplate: (id: string) => void
+}
 
 interface HeaderBarProps {
   settings: PlaygroundSettings
@@ -38,9 +48,9 @@ interface HeaderBarProps {
   mobilePanel?: PanelState
   onUpdateMobileSystemPrompt?: (prompt: string) => void
   onUpdateMobileTitle?: (title: string) => void
-  onOpenSidebar?: () => void
   templates?: PromptTemplate[]
   onApplyTemplate?: (content: string) => void
+  templateStore?: TemplateStore
 }
 
 /* ------------------------------------------------------------------ */
@@ -183,6 +193,222 @@ function DesktopManageMenu({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Desktop Template Menu (floating dropdown)                          */
+/* ------------------------------------------------------------------ */
+
+function DesktopTemplateMenu({
+  templateStore,
+}: {
+  templateStore: TemplateStore
+}) {
+  const [open, setOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newContent, setNewContent] = useState("")
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editContent, setEditContent] = useState("")
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setAdding(false)
+        setEditingId(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  const handleAdd = () => {
+    if (!newName.trim() || !newContent.trim()) return
+    templateStore.addTemplate(newName.trim(), newContent.trim())
+    setNewName("")
+    setNewContent("")
+    setAdding(false)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingId || !editName.trim()) return
+    templateStore.updateTemplate(editingId, { name: editName.trim(), content: editContent.trim() })
+    setEditingId(null)
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <motion.button
+        onClick={() => { setOpen(!open); setAdding(false); setEditingId(null) }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.9 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+        className={cn(
+          "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-colors",
+          open
+            ? "text-primary bg-primary/8"
+            : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+        )}
+      >
+        <FileText className="h-4 w-4" />
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="absolute top-full right-0 mt-2 z-50"
+          >
+            <div className="bg-card border border-border/60 rounded-2xl w-72 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+                <span className="text-xs font-heading text-foreground">{"テンプレート"}</span>
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href="/templates"
+                    className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => setOpen(false)}
+                  >
+                    {"管理ページ"}
+                  </Link>
+                  <button
+                    onClick={() => { setAdding(true); setEditingId(null) }}
+                    className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <BookmarkPlus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Add new template */}
+              <AnimatePresence>
+                {adding && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                    className="overflow-hidden border-b border-border/40"
+                  >
+                    <div className="px-3 py-2.5 space-y-2">
+                      <Input
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder="テンプレート名..."
+                        className="h-7 text-xs rounded-lg bg-background/60 border-border/60"
+                      />
+                      <Textarea
+                        value={newContent}
+                        onChange={(e) => setNewContent(e.target.value)}
+                        placeholder="System prompt..."
+                        className="text-xs min-h-[56px] resize-none font-mono bg-background/60 border-border/60 rounded-lg"
+                        rows={2}
+                      />
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <button
+                          onClick={() => { setAdding(false); setNewName(""); setNewContent("") }}
+                          className="px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {"キャンセル"}
+                        </button>
+                        <button
+                          onClick={handleAdd}
+                          disabled={!newName.trim() || !newContent.trim()}
+                          className="px-3 py-1 text-[11px] font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-40 transition-all"
+                        >
+                          {"追加"}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Template list */}
+              <div className="max-h-56 overflow-y-auto custom-scrollbar">
+                {templateStore.templates.length === 0 && !adding ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-[11px] text-muted-foreground/50">
+                      {"テンプレートがありません"}
+                    </p>
+                  </div>
+                ) : (
+                  templateStore.templates.map((t) => (
+                    <div key={t.id}>
+                      {editingId === t.id ? (
+                        <div className="px-3 py-2.5 space-y-2 border-b border-border/20">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="h-7 text-xs rounded-lg bg-background/60 border-border/60"
+                          />
+                          <Textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            className="text-xs min-h-[56px] resize-none font-mono bg-background/60 border-border/60 rounded-lg"
+                            rows={2}
+                          />
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              {"キャンセル"}
+                            </button>
+                            <button
+                              onClick={handleSaveEdit}
+                              className="px-3 py-1 text-[11px] font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all"
+                            >
+                              {"保存"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="group flex items-start gap-2 px-4 py-2.5 hover:bg-primary/3 transition-colors border-b border-border/10 last:border-b-0">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-foreground truncate">{t.name}</div>
+                            <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                              {t.content.slice(0, 60)}{"..."}
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditingId(t.id)
+                                setEditName(t.name)
+                                setEditContent(t.content)
+                                setAdding(false)
+                              }}
+                              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                            </button>
+                            <button
+                              onClick={() => templateStore.deleteTemplate(t.id)}
+                              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Panel Count Stepper                                                */
 /* ------------------------------------------------------------------ */
 
@@ -233,19 +459,25 @@ export function HeaderBar({
   mobilePanel,
   onUpdateMobileSystemPrompt,
   onUpdateMobileTitle,
-  onOpenSidebar,
   templates = [],
   onApplyTemplate,
+  templateStore,
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileManageOpen, setMobileManageOpen] = useState(false)
+  const [mobileTemplatesOpen, setMobileTemplatesOpen] = useState(false)
   const [manageSelected, setManageSelected] = useState<ManageTabId>("chats")
   const [manageConfirming, setManageConfirming] = useState(false)
   const [isEditingPromptTitle, setIsEditingPromptTitle] = useState(false)
   const [promptTitleDraft, setPromptTitleDraft] = useState(mobilePanel?.title ?? "")
   const [promptCopied, setPromptCopied] = useState(false)
   const promptTitleInputRef = useRef<HTMLInputElement>(null)
+
+  /* Mobile template add state */
+  const [mobileAdding, setMobileAdding] = useState(false)
+  const [mobileNewName, setMobileNewName] = useState("")
+  const [mobileNewContent, setMobileNewContent] = useState("")
 
   const commitPromptTitle = () => {
     const trimmed = promptTitleDraft.trim()
@@ -280,6 +512,23 @@ export function HeaderBar({
   }
 
   const manageCurrentTab = MANAGE_TABS.find((t) => t.id === manageSelected)!
+
+  /* Close other panels on open */
+  const closeAllMobilePanels = () => {
+    setMobileMenuOpen(false)
+    setMobileManageOpen(false)
+    setMobileTemplatesOpen(false)
+    setMobilePromptOpen?.(false)
+    setManageConfirming(false)
+  }
+
+  const handleMobileAddTemplate = () => {
+    if (!mobileNewName.trim() || !mobileNewContent.trim() || !templateStore) return
+    templateStore.addTemplate(mobileNewName.trim(), mobileNewContent.trim())
+    setMobileNewName("")
+    setMobileNewContent("")
+    setMobileAdding(false)
+  }
 
   return (
     <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4 md:pb-0 z-20 relative">
@@ -325,7 +574,10 @@ export function HeaderBar({
             </div>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-1">
+            {templateStore && (
+              <DesktopTemplateMenu templateStore={templateStore} />
+            )}
             <DesktopManageMenu
               onClearChats={onClearChats}
               onClearApiKey={onClearApiKey}
@@ -337,17 +589,6 @@ export function HeaderBar({
         {/* Mobile layout */}
         <div className="flex md:hidden items-center justify-between px-3 h-12">
           <div className="flex items-center gap-1.5">
-            {onOpenSidebar && (
-              <motion.button
-                onClick={onOpenSidebar}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.85 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary transition-colors"
-              >
-                <PanelLeft className="h-3.5 w-3.5" />
-              </motion.button>
-            )}
             <div className="h-6 w-6 rounded-lg bg-card flex items-center justify-center border border-border/60 overflow-hidden">
               <Image src="/images/longcat-color.svg" alt="Longcat" width={16} height={16} className="h-4 w-4" />
             </div>
@@ -356,9 +597,30 @@ export function HeaderBar({
             </h1>
           </div>
           <div className="flex items-center gap-0.5">
+            {/* Templates button */}
+            <motion.button
+              onClick={() => {
+                const next = !mobileTemplatesOpen
+                closeAllMobilePanels()
+                setMobileTemplatesOpen(next)
+              }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              className={cn(
+                "h-8 w-8 flex items-center justify-center rounded-xl transition-colors",
+                mobileTemplatesOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
+              )}
+            >
+              <FileText className="h-4 w-4" />
+            </motion.button>
             {/* Manage button */}
             <motion.button
-              onClick={() => { setMobileManageOpen(!mobileManageOpen); setMobileMenuOpen(false); setMobilePromptOpen?.(false); setManageConfirming(false) }}
+              onClick={() => {
+                const next = !mobileManageOpen
+                closeAllMobilePanels()
+                setMobileManageOpen(next)
+              }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.85 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -371,7 +633,11 @@ export function HeaderBar({
             </motion.button>
             {/* Settings button */}
             <motion.button
-              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); setMobileManageOpen(false); setMobilePromptOpen?.(false) }}
+              onClick={() => {
+                const next = !mobileMenuOpen
+                closeAllMobilePanels()
+                setMobileMenuOpen(next)
+              }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.85 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -427,7 +693,7 @@ export function HeaderBar({
           )}
         </AnimatePresence>
 
-        {/* Mobile: Manage slide-down (same pattern as settings) */}
+        {/* Mobile: Manage slide-down */}
         <AnimatePresence>
           {mobileManageOpen && (
             <motion.div
@@ -438,7 +704,6 @@ export function HeaderBar({
               className="md:hidden overflow-hidden border-t border-border/40"
             >
               <div className="px-4 py-3">
-                {/* Tab selector */}
                 <div className="flex rounded-xl border border-border/50 bg-background/60 p-1 mb-3">
                   {MANAGE_TABS.map((tab) => {
                     const isActive = manageSelected === tab.id
@@ -465,7 +730,6 @@ export function HeaderBar({
                     )
                   })}
                 </div>
-
                 <p className="text-[10px] text-muted-foreground mb-2 px-1">
                   {manageCurrentTab.description}
                 </p>
@@ -491,7 +755,112 @@ export function HeaderBar({
           )}
         </AnimatePresence>
 
-        {/* Mobile: System prompt slide-down (same pattern as settings/manage) */}
+        {/* Mobile: Templates slide-down */}
+        <AnimatePresence>
+          {mobileTemplatesOpen && templateStore && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="md:hidden overflow-hidden border-t border-border/40"
+            >
+              <div className="px-4 py-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading text-foreground">{"テンプレート"}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href="/templates"
+                      className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => setMobileTemplatesOpen(false)}
+                    >
+                      {"管理ページ"}
+                    </Link>
+                    <button
+                      onClick={() => setMobileAdding(true)}
+                      className="h-6 w-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                    >
+                      <BookmarkPlus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Inline add */}
+                <AnimatePresence>
+                  {mobileAdding && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                      className="overflow-hidden space-y-2"
+                    >
+                      <Input
+                        value={mobileNewName}
+                        onChange={(e) => setMobileNewName(e.target.value)}
+                        placeholder="テンプレート名..."
+                        className="h-8 text-xs rounded-lg bg-background/60 border-border/60"
+                      />
+                      <Textarea
+                        value={mobileNewContent}
+                        onChange={(e) => setMobileNewContent(e.target.value)}
+                        placeholder="System prompt..."
+                        className="text-xs min-h-[56px] resize-none font-mono bg-background/60 border-border/60 rounded-lg"
+                        rows={2}
+                      />
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <button
+                          onClick={() => { setMobileAdding(false); setMobileNewName(""); setMobileNewContent("") }}
+                          className="px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {"キャンセル"}
+                        </button>
+                        <button
+                          onClick={handleMobileAddTemplate}
+                          disabled={!mobileNewName.trim() || !mobileNewContent.trim()}
+                          className="px-3 py-1 text-[11px] font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-40 transition-all"
+                        >
+                          {"追加"}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Template list */}
+                <div className="max-h-44 overflow-y-auto custom-scrollbar -mx-1">
+                  {templateStore.templates.length === 0 && !mobileAdding ? (
+                    <p className="text-center text-[11px] text-muted-foreground/50 py-4">
+                      {"テンプレートがありません"}
+                    </p>
+                  ) : (
+                    templateStore.templates.map((t) => (
+                      <div
+                        key={t.id}
+                        className="group flex items-center gap-2 px-1 py-2 rounded-lg hover:bg-primary/3 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-foreground truncate">{t.name}</div>
+                          <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                            {t.content.slice(0, 50)}{"..."}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => templateStore.deleteTemplate(t.id)}
+                          className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile: System prompt slide-down */}
         <AnimatePresence>
           {mobilePromptOpen && mobilePanel && onUpdateMobileSystemPrompt && (
             <motion.div
@@ -544,7 +913,7 @@ export function HeaderBar({
 
                 {/* Template apply button */}
                 {templates.length > 0 && onApplyTemplate && (
-                  <MobileTemplateDropdown
+                  <MobileTemplateApplyDropdown
                     templates={templates}
                     onApply={onApplyTemplate}
                   />
@@ -603,10 +972,10 @@ export function HeaderBar({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Mobile Template Dropdown                                           */
+/*  Mobile Template Apply Dropdown                                     */
 /* ------------------------------------------------------------------ */
 
-function MobileTemplateDropdown({
+function MobileTemplateApplyDropdown({
   templates,
   onApply,
 }: {

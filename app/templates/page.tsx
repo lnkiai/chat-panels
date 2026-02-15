@@ -12,106 +12,67 @@ import {
   Type,
   ArrowLeft,
   FileText,
-  PanelLeft,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Textarea } from "@/components/ui/textarea"
-import { Sidebar, SIDEBAR_WIDTH, ICON_BAR_WIDTH } from "@/components/sidebar"
 import { useTemplates } from "@/hooks/use-templates"
 import type { PromptTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function TemplatesPage() {
   const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener("resize", check)
-    return () => window.removeEventListener("resize", check)
-  }, [])
-
-  const contentMargin = isMobile ? 0 : sidebarOpen ? SIDEBAR_WIDTH : ICON_BAR_WIDTH
 
   return (
-    <div className="flex h-dvh bg-background overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onOpen={() => setSidebarOpen(true)}
-        isMobile={isMobile}
-        templates={templates}
-      />
-
-      {/* Main content */}
-      <div
-        className="flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-out"
-        style={{ marginLeft: contentMargin }}
-      >
-        {/* Header */}
-        <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4">
-          <header className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl">
-            <div className="flex items-center justify-between px-4 h-14 md:px-5">
-              <div className="flex items-center gap-2">
-                {/* Mobile sidebar toggle */}
-                {isMobile && (
-                  <motion.button
-                    onClick={() => setSidebarOpen(true)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.85 }}
-                    className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary transition-colors md:hidden"
-                  >
-                    <PanelLeft className="h-3.5 w-3.5" />
-                  </motion.button>
-                )}
-                <FileText className="h-4 w-4 text-primary" />
-                <h1 className="text-sm font-heading tracking-tight text-foreground">
-                  {"テンプレート管理"}
-                </h1>
-              </div>
-              <Link
-                href="/"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                <span>{"Playgroundに戻る"}</span>
-              </Link>
+    <div className="flex h-dvh bg-background overflow-hidden flex-col">
+      {/* Header */}
+      <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4">
+        <header className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl">
+          <div className="flex items-center justify-between px-4 h-14 md:px-5">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              <h1 className="text-sm font-heading tracking-tight text-foreground">
+                {"テンプレート管理"}
+              </h1>
             </div>
-          </header>
-        </div>
-
-        {/* Template list */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-6 md:px-6">
-          <div className="max-w-2xl mx-auto space-y-4">
-            {/* Add button */}
-            <CreateTemplateForm onAdd={addTemplate} />
-
-            {/* Empty state */}
-            {templates.length === 0 && (
-              <div className="text-center py-16">
-                <FileText className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground/50">
-                  {"テンプレートがまだありません"}
-                </p>
-                <p className="text-xs text-muted-foreground/30 mt-1">
-                  {"上のボタンから作成できます"}
-                </p>
-              </div>
-            )}
-
-            {/* Template cards */}
-            {templates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                onUpdate={updateTemplate}
-                onDelete={deleteTemplate}
-              />
-            ))}
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              <span>{"Playgroundに戻る"}</span>
+            </Link>
           </div>
+        </header>
+      </div>
+
+      {/* Template list */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-6 md:px-6">
+        <div className="max-w-2xl mx-auto space-y-4">
+          {/* Add button */}
+          <CreateTemplateForm onAdd={addTemplate} />
+
+          {/* Empty state */}
+          {templates.length === 0 && (
+            <div className="text-center py-16">
+              <FileText className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground/50">
+                {"テンプレートがまだありません"}
+              </p>
+              <p className="text-xs text-muted-foreground/30 mt-1">
+                {"上のボタンから作成できます"}
+              </p>
+            </div>
+          )}
+
+          {/* Template cards */}
+          {templates.map((t) => (
+            <TemplateCard
+              key={t.id}
+              template={t}
+              onUpdate={updateTemplate}
+              onDelete={deleteTemplate}
+            />
+          ))}
         </div>
       </div>
     </div>
