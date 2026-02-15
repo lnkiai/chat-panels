@@ -233,6 +233,9 @@ export function usePlayground() {
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
+  const panelsRef = useRef(panels)
+  panelsRef.current = panels
+
   /* ------ Settings updates ------ */
 
   const updatePanelCount = useCallback((count: number) => {
@@ -317,15 +320,23 @@ export function usePlayground() {
 
       const currentSettings = { ...snap }
 
-      let currentPanelSnapshots: PanelState[] = []
-      setPanels((prev) => {
-        currentPanelSnapshots = prev.slice(0, currentSettings.panelCount)
-        return prev.map((p, idx) =>
+      // Read panels synchronously from ref - guaranteed latest
+      const currentPanelSnapshots = panelsRef.current
+        .slice(0, currentSettings.panelCount)
+        .map((p) => ({ ...p }))
+
+      console.log("[v0] sendMessage: captured", currentPanelSnapshots.length, "panels, IDs:", currentPanelSnapshots.map(p => p.id))
+
+      if (currentPanelSnapshots.length === 0) return
+
+      // Add user message + set loading
+      setPanels((prev) =>
+        prev.map((p, idx) =>
           idx < currentSettings.panelCount
             ? { ...p, messages: [...p.messages, userMsg], isLoading: true }
             : p
         )
-      })
+      )
 
       const promises = currentPanelSnapshots.map(async (panelSnapshot) => {
         const panelId = panelSnapshot.id
@@ -363,6 +374,7 @@ export function usePlayground() {
             { role: "user" as const, content: userMessage },
           ]
 
+          console.log("[v0] Fetching for panel", panelId, "model:", currentSettings.model, "messages:", messagesForApi.length)
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -376,6 +388,7 @@ export function usePlayground() {
             signal: abortController.signal,
           })
 
+          console.log("[v0] Response status for panel", panelId, ":", response.status, response.ok)
           if (!response.ok) {
             const errorText = await response.text()
             let errorMessage = `API error: ${response.status}`
@@ -393,8 +406,12 @@ export function usePlayground() {
 
           let accContent = ""
           let accThinking = ""
+          let chunkCount = 0
 
+          console.log("[v0] Starting stream read for panel", panelId)
           for await (const delta of parseSSEStream(reader)) {
+            chunkCount++
+            if (chunkCount <= 3) console.log("[v0] Panel", panelId, "chunk", chunkCount, "content:", delta.content.slice(0, 30), "thinking:", delta.thinking.slice(0, 30))
             accContent += delta.content
             accThinking += delta.thinking
 
@@ -422,6 +439,7 @@ export function usePlayground() {
             )
           }
 
+          console.log("[v0] Stream done for panel", panelId, "total chunks:", chunkCount, "content length:", accContent.length)
           const finalContent = accContent
           const finalThinking = accThinking
 
@@ -450,6 +468,7 @@ export function usePlayground() {
 
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error"
+          console.log("[v0] Error for panel", panelId, ":", errorMessage)
 
           setPanels((prev) =>
             prev.map((p) =>
