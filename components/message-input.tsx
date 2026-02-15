@@ -103,7 +103,7 @@ export function MessageInput({
   const tokenEstimate = Math.ceil(charCount / 3)
 
   return (
-    <footer className="bg-transparent border-none shrink-0 relative z-20">
+    <footer className="border-none shrink-0 relative z-20 bg-gradient-to-t from-background via-background/90 to-transparent md:bg-transparent">
       {/* Mobile system prompt editor - slides down like header settings */}
       <AnimatePresence>
         {mobilePromptOpen && mobilePanel && onUpdateMobileSystemPrompt && (
@@ -207,7 +207,7 @@ export function MessageInput({
         )}
       </AnimatePresence>
 
-      <div className="px-4 pt-2 pb-4 max-w-3xl mx-auto">
+      <div className="px-4 pt-6 pb-4 md:pt-2 max-w-3xl mx-auto">
         {/* Capsule input container */}
         <div className="bg-card border-2 border-border rounded-[28px] focus-within:border-primary/40 transition-all shadow-[0_2px_12px_rgba(62,168,255,0.06)]">
           {/* Textarea */}

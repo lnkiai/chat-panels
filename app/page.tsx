@@ -90,12 +90,12 @@ export default function PlaygroundPage() {
       />
 
       {/* ============ MOBILE ============ */}
-      <div className="flex-1 min-h-0 flex flex-col md:hidden relative">
-        {/* Scroll-snap container - full screen panels */}
+      {/* Mobile panels are absolute, stretching the full screen (behind header + input) */}
+      <div className="md:hidden absolute inset-0 z-0">
         <div
           ref={mobileScrollRef}
           onScroll={handleMobileScroll}
-          className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar"
+          className="h-full w-full flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar"
         >
           {panels.map((panel, idx) => (
             <div
@@ -117,47 +117,50 @@ export default function PlaygroundPage() {
             </div>
           ))}
         </div>
-
-        {/* Floating nav arrows + dots */}
-        {count > 1 && (
-          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3 z-20 pointer-events-none">
-            <motion.button
-              onClick={goMobilePrev}
-              disabled={mobileIndex === 0}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.85 }}
-              className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </motion.button>
-
-            <div className="pointer-events-auto flex items-center gap-1.5">
-              {panels.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => scrollToPanel(idx)}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all",
-                    idx === mobileIndex
-                      ? "w-5 bg-primary"
-                      : "w-1.5 bg-border hover:bg-muted-foreground/40"
-                  )}
-                />
-              ))}
-            </div>
-
-            <motion.button
-              onClick={goMobileNext}
-              disabled={mobileIndex >= count - 1}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.85 }}
-              className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-card/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </motion.button>
-          </div>
-        )}
       </div>
+
+      {/* Mobile: Floating nav arrows + dots (centered vertically, above input) */}
+      {count > 1 && (
+        <div className="md:hidden fixed bottom-36 left-0 right-0 flex items-center justify-center gap-3 z-30 pointer-events-none">
+          <motion.button
+            onClick={goMobilePrev}
+            disabled={mobileIndex === 0}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.85 }}
+            className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-white/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </motion.button>
+
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            {panels.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => scrollToPanel(idx)}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  idx === mobileIndex
+                    ? "w-5 bg-primary"
+                    : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                )}
+              />
+            ))}
+          </div>
+
+          <motion.button
+            onClick={goMobileNext}
+            disabled={mobileIndex >= count - 1}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.85 }}
+            className="pointer-events-auto h-7 w-7 flex items-center justify-center rounded-lg bg-white/90 border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </motion.button>
+        </div>
+      )}
+
+      {/* Mobile: spacer so footer floats above the absolute panels */}
+      <div className="md:hidden flex-1" />
 
       {/* ============ DESKTOP ============ */}
       <main className="flex-1 min-h-0 hidden md:block p-4 pt-3">

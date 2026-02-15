@@ -205,7 +205,7 @@ export function ChatPanel({
         ) : (
           <div className={cn(
             "px-3 flex flex-col gap-3",
-            isMobileFullscreen ? "pt-16 pb-8" : "py-3"
+            isMobileFullscreen ? "pt-16 pb-40" : "py-3"
           )}>
             {panel.messages.map((message, i) => (
               <MessageBubble
@@ -226,15 +226,20 @@ export function ChatPanel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="shrink-0 flex justify-center py-1"
+            className={cn(
+              "flex justify-center pointer-events-none",
+              isMobileFullscreen
+                ? "absolute left-0 right-0 bottom-44 z-30"
+                : "shrink-0 py-1"
+            )}
           >
             <button
               onClick={scrollToBottom}
               className={cn(
-                "flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                "pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border",
                 hasNewMessages
                   ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-card/90 text-muted-foreground border-border/50 hover:text-foreground"
+                  : "bg-white/90 text-muted-foreground border-border/50 hover:text-foreground"
               )}
             >
               <ChevronDown className="h-3 w-3" />
