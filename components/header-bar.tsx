@@ -14,6 +14,7 @@ import {
   Check,
   Type,
   PanelLeft,
+  AtSign,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
@@ -21,7 +22,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { PlaygroundSettings, PanelState } from "@/lib/types"
+import type { PlaygroundSettings, PanelState, PromptTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface HeaderBarProps {
@@ -38,6 +39,8 @@ interface HeaderBarProps {
   onUpdateMobileSystemPrompt?: (prompt: string) => void
   onUpdateMobileTitle?: (title: string) => void
   onOpenSidebar?: () => void
+  templates?: PromptTemplate[]
+  onApplyTemplate?: (content: string) => void
 }
 
 /* ------------------------------------------------------------------ */
@@ -231,6 +234,8 @@ export function HeaderBar({
   onUpdateMobileSystemPrompt,
   onUpdateMobileTitle,
   onOpenSidebar,
+  templates = [],
+  onApplyTemplate,
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -282,17 +287,6 @@ export function HeaderBar({
         {/* Desktop layout */}
         <div className="hidden md:flex items-center justify-between px-5 h-14">
           <div className="flex items-center shrink-0 gap-2">
-            {onOpenSidebar && (
-              <motion.button
-                onClick={onOpenSidebar}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                className="h-8 w-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </motion.button>
-            )}
             <div className="h-7 w-7 rounded-xl bg-card flex items-center justify-center border border-border/60 overflow-hidden">
               <Image src="/images/longcat-color.svg" alt="Longcat" width={20} height={20} className="h-5 w-5" />
             </div>
@@ -548,6 +542,14 @@ export function HeaderBar({
                   </button>
                 </div>
 
+                {/* Template apply button */}
+                {templates.length > 0 && onApplyTemplate && (
+                  <MobileTemplateDropdown
+                    templates={templates}
+                    onApply={onApplyTemplate}
+                  />
+                )}
+
                 {/* Textarea */}
                 <Textarea
                   value={mobilePanel.systemPrompt}
@@ -596,6 +598,75 @@ export function HeaderBar({
           )}
         </AnimatePresence>
       </header>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mobile Template Dropdown                                           */
+/* ------------------------------------------------------------------ */
+
+function MobileTemplateDropdown({
+  templates,
+  onApply,
+}: {
+  templates: PromptTemplate[]
+  onApply: (content: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all",
+          "border border-border/60 bg-background/60 text-muted-foreground",
+          "hover:border-primary/40 hover:text-foreground",
+          open && "border-primary/40 text-primary bg-primary/5"
+        )}
+      >
+        <AtSign className="h-3 w-3" />
+        <span>{"テンプレートを適用"}</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-xl overflow-hidden z-50 shadow-lg"
+            >
+              <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      onApply(t.content)
+                      setOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="text-xs font-medium text-foreground truncate">
+                      {t.name}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                      {t.content.slice(0, 50)}{"..."}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

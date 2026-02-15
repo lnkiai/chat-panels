@@ -1,548 +1,318 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
-  X,
-  Plus,
-  Pencil,
-  Trash2,
-  Check,
-  ChevronRight,
+  PanelLeft,
+  PanelLeftClose,
+  Sparkles,
   FileText,
-  Settings2,
-  Copy,
-  Type,
+  Settings,
 } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Textarea } from "@/components/ui/textarea"
-import type { PromptTemplate, PanelState } from "@/lib/types"
+import { motion } from "framer-motion"
+import type { PromptTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const SIDEBAR_WIDTH = 256
+const ICON_BAR_WIDTH = 56
+
+export { SIDEBAR_WIDTH, ICON_BAR_WIDTH }
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
 interface SidebarProps {
-  open: boolean
+  isOpen: boolean
   onClose: () => void
+  onOpen: () => void
+  isMobile: boolean
   templates: PromptTemplate[]
-  onAddTemplate: (name: string, content: string) => PromptTemplate
-  onUpdateTemplate: (id: string, updates: Partial<Pick<PromptTemplate, "name" | "content">>) => void
-  onDeleteTemplate: (id: string) => void
-  panels: PanelState[]
-  onUpdateSystemPrompt: (panelId: number, prompt: string) => void
-  onUpdatePanelTitle: (panelId: number, title: string) => void
+  /** Called when user picks a template in sidebar to apply to current panel */
+  onApplyTemplate?: (content: string) => void
 }
 
-type SidebarTab = "templates" | "panels"
+/* ------------------------------------------------------------------ */
+/*  Navigation items                                                   */
+/* ------------------------------------------------------------------ */
+
+const NAV_ITEMS = [
+  { id: "playground", label: "Playground", icon: Sparkles, href: "/" },
+  { id: "templates", label: "テンプレート管理", icon: FileText, href: "/templates" },
+] as const
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function Sidebar({
-  open,
+  isOpen,
   onClose,
+  onOpen,
+  isMobile,
   templates,
-  onAddTemplate,
-  onUpdateTemplate,
-  onDeleteTemplate,
-  panels,
-  onUpdateSystemPrompt,
-  onUpdatePanelTitle,
+  onApplyTemplate,
 }: SidebarProps) {
-  const [tab, setTab] = useState<SidebarTab>("templates")
+  const pathname = usePathname()
+  const [iconBarHover, setIconBarHover] = useState<number | null>(null)
 
+  const activeIndex = NAV_ITEMS.findIndex((item) =>
+    item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+  )
+  const indicatorIndex = iconBarHover !== null ? iconBarHover : activeIndex
+
+  const ICON_ITEM_SIZE = 40
+  const ICON_ITEM_GAP = 4
+
+  /* ---- Mobile: overlay sidebar ---- */
+  if (isMobile) {
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className={cn(
+            "fixed inset-0 backdrop-blur-sm bg-background/30 z-40 transition-opacity duration-300 md:hidden",
+            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          onClick={onClose}
+        />
+        <aside
+          className={cn(
+            "fixed top-0 left-0 h-full w-64 z-50 bg-card border-r border-border/60 flex flex-col md:hidden",
+            "transition-transform duration-300 ease-out shadow-xl",
+            isOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          <SidebarContent
+            onClose={onClose}
+            pathname={pathname}
+            templates={templates}
+            onApplyTemplate={onApplyTemplate}
+            isMobile
+          />
+        </aside>
+      </>
+    )
+  }
+
+  /* ---- Desktop: icon bar (collapsed) + full sidebar (expanded) ---- */
   return (
     <>
-      {/* Backdrop */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
-            onClick={onClose}
-          />
+      {/* Icon bar (visible when sidebar is collapsed) */}
+      <aside
+        className={cn(
+          "fixed top-0 left-0 h-full z-20 bg-card/60 backdrop-blur-xl border-r border-border/40 flex flex-col items-center py-4 gap-3",
+          "transition-all duration-300 ease-out",
+          isOpen ? "w-0 opacity-0 pointer-events-none" : "opacity-100"
         )}
-      </AnimatePresence>
+        style={{ width: isOpen ? 0 : ICON_BAR_WIDTH }}
+      >
+        {/* Open button */}
+        <motion.button
+          onClick={onOpen}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          className="h-9 w-9 flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+          title="サイドバーを開く"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </motion.button>
 
-      {/* Slide panel */}
-      <AnimatePresence>
-        {open && (
-          <motion.aside
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-0 top-0 bottom-0 z-50 w-[340px] md:w-[380px] bg-card border-r border-border/60 flex flex-col overflow-hidden shadow-xl"
-          >
-            {/* Header */}
-            <div className="shrink-0 flex items-center justify-between px-5 h-14 border-b border-border/50">
-              <h2 className="text-sm font-heading text-foreground">
-                {"Prompt Manager"}
-              </h2>
-              <motion.button
-                onClick={onClose}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="h-8 w-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </motion.button>
-            </div>
+        {/* Nav icons */}
+        <div className="relative mt-2">
+          {/* Animated indicator background */}
+          {indicatorIndex >= 0 && (
+            <div
+              className="absolute left-0 right-0 h-10 w-10 bg-primary/8 rounded-lg pointer-events-none transition-transform duration-200"
+              style={{
+                transform: `translateY(${indicatorIndex * (ICON_ITEM_SIZE + ICON_ITEM_GAP)}px)`,
+              }}
+            />
+          )}
+          <div className="flex flex-col gap-1">
+            {NAV_ITEMS.map((item, index) => {
+              const Icon = item.icon
+              const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={cn(
+                    "h-10 w-10 flex items-center justify-center rounded-lg relative z-10 transition-colors",
+                    isActive || iconBarHover === index
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title={item.label}
+                  onMouseEnter={() => setIconBarHover(index)}
+                  onMouseLeave={() => setIconBarHover(null)}
+                >
+                  <Icon className="h-4.5 w-4.5" />
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </aside>
 
-            {/* Tab switcher */}
-            <div className="shrink-0 flex mx-4 mt-3 bg-muted/50 rounded-xl p-1 gap-1">
-              <button
-                onClick={() => setTab("templates")}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all",
-                  tab === "templates"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>{"テンプレート"}</span>
-              </button>
-              <button
-                onClick={() => setTab("panels")}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all",
-                  tab === "panels"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span>{"パネル設定"}</span>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
-              {tab === "templates" ? (
-                <TemplatesSection
-                  templates={templates}
-                  onAdd={onAddTemplate}
-                  onUpdate={onUpdateTemplate}
-                  onDelete={onDeleteTemplate}
-                />
-              ) : (
-                <PanelsSection
-                  panels={panels}
-                  onUpdatePrompt={onUpdateSystemPrompt}
-                  onUpdateTitle={onUpdatePanelTitle}
-                />
-              )}
-            </div>
-          </motion.aside>
+      {/* Full sidebar panel */}
+      <aside
+        className={cn(
+          "fixed top-0 left-0 h-full z-20 bg-card/80 backdrop-blur-xl border-r border-border/60 flex flex-col",
+          "transition-transform duration-300 ease-out shadow-lg"
         )}
-      </AnimatePresence>
+        style={{
+          width: SIDEBAR_WIDTH,
+          transform: isOpen ? "translateX(0)" : `translateX(-${SIDEBAR_WIDTH}px)`,
+        }}
+      >
+        <SidebarContent
+          onClose={onClose}
+          pathname={pathname}
+          templates={templates}
+          onApplyTemplate={onApplyTemplate}
+          isMobile={false}
+        />
+      </aside>
     </>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Templates section                                                  */
+/*  Sidebar inner content                                              */
 /* ------------------------------------------------------------------ */
 
-function TemplatesSection({
+function SidebarContent({
+  onClose,
+  pathname,
   templates,
-  onAdd,
-  onUpdate,
-  onDelete,
+  onApplyTemplate,
+  isMobile,
 }: {
+  onClose: () => void
+  pathname: string
   templates: PromptTemplate[]
-  onAdd: (name: string, content: string) => PromptTemplate
-  onUpdate: (id: string, updates: Partial<Pick<PromptTemplate, "name" | "content">>) => void
-  onDelete: (id: string) => void
+  onApplyTemplate?: (content: string) => void
+  isMobile: boolean
 }) {
-  const [isCreating, setIsCreating] = useState(false)
-  const [newName, setNewName] = useState("")
-  const [newContent, setNewContent] = useState("")
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState("")
-  const [editContent, setEditContent] = useState("")
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const activeIndex = NAV_ITEMS.findIndex((item) =>
+    item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+  )
+  const indicatorIndex = hoveredIndex !== null ? hoveredIndex : activeIndex
 
-  const handleCreate = () => {
-    if (!newName.trim() || !newContent.trim()) return
-    onAdd(newName.trim(), newContent.trim())
-    setNewName("")
-    setNewContent("")
-    setIsCreating(false)
-  }
-
-  const startEdit = (t: PromptTemplate) => {
-    setEditingId(t.id)
-    setEditName(t.name)
-    setEditContent(t.content)
-  }
-
-  const commitEdit = () => {
-    if (!editingId || !editName.trim()) return
-    onUpdate(editingId, { name: editName.trim(), content: editContent.trim() })
-    setEditingId(null)
-  }
+  const ITEM_HEIGHT = 40
+  const ITEM_GAP = 4
 
   return (
-    <div className="px-4 py-3 space-y-3">
-      {/* Add button */}
-      {!isCreating && (
+    <>
+      {/* Header */}
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border/40 shrink-0">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-heading text-foreground">Longcat AI</h2>
+        </div>
         <motion.button
-          onClick={() => setIsCreating(true)}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-border/80 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all"
+          onClick={onClose}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          className="h-8 w-8 flex items-center justify-center rounded-xl border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
         >
-          <Plus className="h-3.5 w-3.5" />
-          <span>{"新しいテンプレート"}</span>
+          <PanelLeftClose className="h-4 w-4" />
         </motion.button>
-      )}
+      </div>
 
-      {/* Create form */}
-      <AnimatePresence>
-        {isCreating && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="overflow-hidden"
-          >
-            <div className="p-3 border border-primary/20 rounded-xl bg-primary/5 space-y-2">
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="テンプレート名"
-                className="w-full text-xs bg-background border border-border/60 rounded-lg px-3 py-2 outline-none focus:border-primary/40"
-                autoFocus
-              />
-              <Textarea
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                placeholder="System prompt content..."
-                className="text-xs min-h-[72px] resize-none font-mono bg-background border-border/60 rounded-lg focus-visible:ring-primary/30"
-                rows={3}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCreate}
-                  disabled={!newName.trim() || !newContent.trim()}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground disabled:opacity-40 transition-opacity"
-                >
-                  <Check className="h-3 w-3" />
-                  <span>{"保存"}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsCreating(false)
-                    setNewName("")
-                    setNewContent("")
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {"キャンセル"}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Templates list */}
-      {templates.length === 0 && !isCreating && (
-        <p className="text-center text-xs text-muted-foreground/50 py-8">
-          {"テンプレートがありません"}
-        </p>
-      )}
-
-      {templates.map((t) => (
-        <div key={t.id}>
-          {editingId === t.id ? (
-            <div className="p-3 border border-primary/20 rounded-xl bg-primary/5 space-y-2">
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full text-xs bg-background border border-border/60 rounded-lg px-3 py-2 outline-none focus:border-primary/40"
-                autoFocus
-              />
-              <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="text-xs min-h-[72px] resize-none font-mono bg-background border-border/60 rounded-lg focus-visible:ring-primary/30"
-                rows={3}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={commitEdit}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground"
-                >
-                  <Check className="h-3 w-3" />
-                  <span>{"更新"}</span>
-                </button>
-                <button
-                  onClick={() => setEditingId(null)}
-                  className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {"キャンセル"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <TemplateCard
-              template={t}
-              onEdit={() => startEdit(t)}
-              onDelete={() => onDelete(t.id)}
+      {/* Navigation */}
+      <div className="px-3 py-3">
+        <div className="relative flex flex-col gap-1">
+          {/* Animated indicator */}
+          {indicatorIndex >= 0 && (
+            <div
+              className="absolute left-0 right-0 bg-primary/8 rounded-lg pointer-events-none transition-transform duration-200"
+              style={{
+                height: ITEM_HEIGHT,
+                transform: `translateY(${indicatorIndex * (ITEM_HEIGHT + ITEM_GAP)}px)`,
+              }}
             />
           )}
+
+          {NAV_ITEMS.map((item, index) => {
+            const Icon = item.icon
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={isMobile ? onClose : undefined}
+                className={cn(
+                  "w-full flex items-center gap-2.5 h-10 px-3 rounded-lg relative z-10 transition-colors text-sm",
+                  isActive || hoveredIndex === index
+                    ? "text-foreground font-medium"
+                    : "text-muted-foreground"
+                )}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </div>
-      ))}
-    </div>
-  )
-}
+      </div>
 
-function TemplateCard({
-  template,
-  onEdit,
-  onDelete,
-}: {
-  template: PromptTemplate
-  onEdit: () => void
-  onDelete: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [copied, setCopied] = useState(false)
+      {/* Divider */}
+      <div className="h-px bg-border/40 mx-3" />
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(template.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [template.content])
-
-  return (
-    <div className="border border-border/60 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors"
-      >
-        <motion.span
-          animate={{ rotate: expanded ? 90 : 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        >
-          <ChevronRight className="h-3 w-3 text-muted-foreground" />
-        </motion.span>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium text-foreground truncate">{template.name}</div>
-          {!expanded && (
-            <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
-              {template.content.slice(0, 50)}{"..."}
-            </div>
-          )}
-        </div>
-      </button>
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 space-y-2">
-              <pre className="text-[11px] font-mono text-muted-foreground bg-background/60 rounded-lg p-2.5 whitespace-pre-wrap max-h-32 overflow-y-auto custom-scrollbar">
-                {template.content}
-              </pre>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={handleCopy}
-                  className={cn(
-                    "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
-                    copied
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
-                  )}
-                >
-                  {copied ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
-                  <span>{copied ? "Copied" : "Copy"}</span>
-                </button>
-                <button
-                  onClick={onEdit}
-                  className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-all"
-                >
-                  <Pencil className="h-2.5 w-2.5" />
-                  <span>{"Edit"}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirmDelete) {
-                      onDelete()
-                    } else {
-                      setConfirmDelete(true)
-                      setTimeout(() => setConfirmDelete(false), 3000)
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
-                    confirmDelete
-                      ? "bg-destructive/10 text-destructive"
-                      : "text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5"
-                  )}
-                >
-                  <Trash2 className="h-2.5 w-2.5" />
-                  <span>{confirmDelete ? "確認" : "Delete"}</span>
-                </button>
-                <div className="flex-1" />
-                <span className="text-[9px] text-muted-foreground/30 flex items-center gap-0.5">
-                  <Type className="h-2 w-2" />
-                  {template.content.length} {"chars"}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Panels section                                                     */
-/* ------------------------------------------------------------------ */
-
-function PanelsSection({
-  panels,
-  onUpdatePrompt,
-  onUpdateTitle,
-}: {
-  panels: PanelState[]
-  onUpdatePrompt: (panelId: number, prompt: string) => void
-  onUpdateTitle: (panelId: number, title: string) => void
-}) {
-  return (
-    <div className="px-4 py-3 space-y-3">
-      {panels.map((panel) => (
-        <PanelPromptEditor
-          key={panel.id}
-          panel={panel}
-          onUpdatePrompt={(prompt) => onUpdatePrompt(panel.id, prompt)}
-          onUpdateTitle={(title) => onUpdateTitle(panel.id, title)}
-        />
-      ))}
-    </div>
-  )
-}
-
-function PanelPromptEditor({
-  panel,
-  onUpdatePrompt,
-  onUpdateTitle,
-}: {
-  panel: PanelState
-  onUpdatePrompt: (prompt: string) => void
-  onUpdateTitle: (title: string) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [titleDraft, setTitleDraft] = useState(panel.title)
-  const titleInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    setTitleDraft(panel.title)
-  }, [panel.title])
-
-  useEffect(() => {
-    if (isEditingTitle && titleInputRef.current) {
-      titleInputRef.current.focus()
-      titleInputRef.current.select()
-    }
-  }, [isEditingTitle])
-
-  const commitTitle = () => {
-    const trimmed = titleDraft.trim()
-    if (trimmed) {
-      onUpdateTitle(trimmed)
-    } else {
-      setTitleDraft(panel.title)
-    }
-    setIsEditingTitle(false)
-  }
-
-  return (
-    <div className="border border-border/60 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="shrink-0"
-        >
-          <motion.span
-            animate={{ rotate: expanded ? 90 : 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          >
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-          </motion.span>
-        </button>
-
-        {isEditingTitle ? (
-          <input
-            ref={titleInputRef}
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitTitle()
-              if (e.key === "Escape") {
-                setTitleDraft(panel.title)
-                setIsEditingTitle(false)
-              }
-            }}
-            className="text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-28 text-foreground"
-            maxLength={30}
-          />
+      {/* Templates quick-select */}
+      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar px-3 py-3">
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider px-2 mb-2">
+          {"テンプレート"}
+        </p>
+        {templates.length === 0 ? (
+          <p className="text-xs text-muted-foreground/40 px-2 py-4 text-center">
+            {"テンプレートがありません"}
+          </p>
         ) : (
-          <button
-            onClick={() => {
-              setTitleDraft(panel.title)
-              setIsEditingTitle(true)
-            }}
-            className="flex items-center gap-1 text-xs font-heading text-foreground hover:text-primary transition-colors group"
-          >
-            <span>{panel.title}</span>
-            <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-          </button>
-        )}
-
-        {!expanded && panel.systemPrompt.trim() && (
-          <span className="ml-auto text-[10px] text-muted-foreground/40 truncate min-w-0 flex-1 text-right pl-3">
-            {panel.systemPrompt}
-          </span>
+          <div className="space-y-1">
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  onApplyTemplate?.(t.content)
+                  if (isMobile) onClose()
+                }}
+                className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-primary/5 transition-colors group"
+              >
+                <div className="text-xs font-medium text-foreground group-hover:text-primary truncate transition-colors">
+                  {t.name}
+                </div>
+                <div className="text-[10px] text-muted-foreground/40 truncate mt-0.5">
+                  {t.content.slice(0, 50)}{"..."}
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 space-y-2">
-              <Textarea
-                value={panel.systemPrompt}
-                onChange={(e) => onUpdatePrompt(e.target.value)}
-                className="text-xs min-h-[80px] resize-none font-mono bg-background/60 border-border/60 rounded-lg focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
-                placeholder="System prompt..."
-                rows={3}
-              />
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
-                <Type className="h-2.5 w-2.5" />
-                <span>{panel.systemPrompt.length.toLocaleString()} {"chars"}</span>
-                <span>{"~"}{Math.ceil(panel.systemPrompt.length / 3).toLocaleString()} {"tokens"}</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {/* Footer */}
+      <div className="shrink-0 px-3 py-3 border-t border-border/40">
+        <Link
+          href="/templates"
+          onClick={isMobile ? onClose : undefined}
+          className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          <span>{"テンプレートを管理"}</span>
+        </Link>
+      </div>
+    </>
   )
 }

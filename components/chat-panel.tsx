@@ -9,12 +9,13 @@ import {
   Copy,
   Check,
   Type,
+  AtSign,
 } from "lucide-react"
 import { TextShimmer } from "@/components/core/text-shimmer"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
-import type { PanelState, ChatMessage } from "@/lib/types"
+import type { PanelState, ChatMessage, PromptTemplate } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
@@ -23,12 +24,16 @@ interface ChatPanelProps {
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
   onUpdateTitle: (title: string) => void
+  templates?: PromptTemplate[]
+  onApplyTemplate?: (content: string) => void
 }
 
 export function ChatPanel({
   panel,
   onUpdateSystemPrompt,
   onUpdateTitle,
+  templates = [],
+  onApplyTemplate,
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -158,6 +163,13 @@ export function ChatPanel({
               className="overflow-hidden"
             >
               <div className="px-3.5 pt-2 pb-3 flex flex-col gap-1.5">
+                {/* Template apply dropdown */}
+                {templates.length > 0 && onApplyTemplate && (
+                  <TemplateApplyDropdown
+                    templates={templates}
+                    onApply={onApplyTemplate}
+                  />
+                )}
                 <Textarea
                   value={panel.systemPrompt}
                   onChange={(e) => onUpdateSystemPrompt(e.target.value)}
@@ -187,7 +199,7 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="px-3 md:px-4 flex flex-col gap-3 pt-20 pb-44 md:pt-16 md:pb-28">
+          <div className="px-3 md:px-4 flex flex-col gap-3 pt-4 pb-44 md:pt-4 md:pb-28">
             {panel.messages.map((message, i) => (
               <MessageBubble
                 key={message.id}
@@ -207,7 +219,7 @@ export function ChatPanel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="absolute left-0 right-0 bottom-48 md:bottom-24 z-30 flex justify-center pointer-events-none"
+            className="absolute left-0 right-0 bottom-8 z-30 flex justify-center pointer-events-none"
           >
             <button
               onClick={scrollToBottom}
@@ -496,6 +508,75 @@ function PromptStatsBar({ content }: { content: string }) {
           {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
         </span>
       </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Template apply dropdown (inside system prompt)                     */
+/* ------------------------------------------------------------------ */
+
+function TemplateApplyDropdown({
+  templates,
+  onApply,
+}: {
+  templates: PromptTemplate[]
+  onApply: (content: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative" data-template-dropdown>
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all",
+          "border border-border/60 bg-background/60 text-muted-foreground",
+          "hover:border-primary/40 hover:text-foreground",
+          open && "border-primary/40 text-primary bg-primary/5"
+        )}
+      >
+        <AtSign className="h-3 w-3" />
+        <span>{"テンプレートを適用"}</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="absolute top-full left-0 mt-1 w-60 bg-card border border-border rounded-xl overflow-hidden z-50 shadow-lg"
+            >
+              <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      onApply(t.content)
+                      setOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="text-xs font-medium text-foreground truncate">
+                      {t.name}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                      {t.content.slice(0, 60)}{"..."}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
