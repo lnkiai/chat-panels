@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
 import type { PanelState, ChatMessage, PromptTemplate } from "@/lib/types"
+import { getAllProviders, getProvider } from "@/lib/ai-providers/registry"
 import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
@@ -24,16 +25,22 @@ interface ChatPanelProps {
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
   onUpdateTitle: (title: string) => void
+  onUpdateConfig?: (config: { providerId?: string; modelId?: string }) => void
+  enablePanelMode?: boolean
   templates?: PromptTemplate[]
   onApplyTemplate?: (content: string) => void
+  availableProviders?: { id: string; name: string; models: { id: string; label: string; description?: string }[] }[]
 }
 
 export function ChatPanel({
   panel,
   onUpdateSystemPrompt,
   onUpdateTitle,
+  onUpdateConfig,
+  enablePanelMode = false,
   templates = [],
   onApplyTemplate,
+  availableProviders
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -163,6 +170,40 @@ export function ChatPanel({
               className="overflow-hidden"
             >
               <div className="px-3.5 pt-2 pb-3 flex flex-col gap-1.5">
+                {/* Panel Mode Selectors */}
+                {enablePanelMode && onUpdateConfig && (
+                  <div className="flex flex-col gap-2 mb-2 p-3 bg-muted/30 rounded-xl border border-border/40">
+                    <div className="grid grid-cols-2 gap-2">
+                      <ConfigDropdown
+                        label="Provider"
+                        value={panel.providerId || ""}
+                        options={(availableProviders || getAllProviders().map(p => ({
+                          id: p.id,
+                          name: p.name,
+                          models: p.models.map(m => ({ id: m.id, label: m.label, description: m.description }))
+                        }))).map(p => ({ id: p.id, label: p.name }))}
+                        onChange={(val) => onUpdateConfig({ providerId: val })}
+                      />
+                      <ConfigDropdown
+                        label="Model"
+                        value={panel.modelId || ""}
+                        options={(() => {
+                          const providers = availableProviders || getAllProviders().map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            models: p.models.map(m => ({ id: m.id, label: m.label, description: m.description }))
+                          }))
+                          const currentProviderId = panel.providerId || providers[0]?.id
+                          const provider = providers.find(p => p.id === currentProviderId)
+                          return provider?.models || []
+                        })()}
+                        onChange={(val) => onUpdateConfig({ modelId: val })}
+                        disabled={!panel.providerId && (!availableProviders || availableProviders.length === 0)}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Template apply dropdown */}
                 {templates.length > 0 && onApplyTemplate && (
                   <TemplateApplyDropdown
@@ -199,7 +240,7 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className="px-3 md:px-4 flex flex-col gap-3 pt-4 pb-44 md:pt-4 md:pb-28">
+          <div className="px-3 md:px-4 flex flex-col gap-3 pt-4 pb-44 md:pt-4 md:pb-52">
             {panel.messages.map((message, i) => (
               <MessageBubble
                 key={message.id}
@@ -219,7 +260,7 @@ export function ChatPanel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="absolute left-0 right-0 bottom-8 z-30 flex justify-center pointer-events-none"
+            className="absolute left-0 right-0 bottom-8 z-30 flex justify-center pointer-events-none md:hidden"
           >
             <button
               onClick={scrollToBottom}
@@ -638,6 +679,107 @@ function ThinkingBlock({
               <Streamdown isAnimating={isStreaming}>{thinking}</Streamdown>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Config Dropdown (Custom Selector)                                  */
+/* ------------------------------------------------------------------ */
+
+function ConfigDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  disabled
+}: {
+  label: string
+  value: string
+  options: { id: string; label: string; description?: string }[]
+  onChange: (val: string) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find(o => o.id === value)
+
+  return (
+    <div className="relative">
+      <motion.button
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className={cn(
+          "w-full flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
+          "border border-border bg-background text-muted-foreground",
+          "hover:border-primary/40 hover:text-foreground",
+          open && "border-primary/40 text-foreground bg-primary/5",
+          disabled && "opacity-50 cursor-not-allowed hover:border-border"
+        )}
+      >
+        <span className="truncate max-w-[120px] text-left">
+          {selected?.label || label}
+        </span>
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        </motion.span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="absolute top-full left-0 mt-1 w-full bg-card border border-border rounded-xl overflow-hidden z-50 shadow-lg min-w-[200px]"
+            >
+              <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                {options.map((opt, i) => (
+                  <motion.button
+                    key={opt.id}
+                    onClick={() => {
+                      onChange(opt.id)
+                      setOpen(false)
+                    }}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 text-left transition-colors",
+                      "hover:bg-primary/5",
+                      value === opt.id && "bg-primary/5"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-foreground truncate">
+                        {opt.label}
+                      </div>
+                      {opt.description && (
+                        <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                          {opt.description}
+                        </div>
+                      )}
+                    </div>
+                    {value === opt.id && (
+                      <Check className="h-3 w-3 text-primary shrink-0" />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

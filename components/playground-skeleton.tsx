@@ -15,7 +15,7 @@ function Bone({ className }: { className?: string }) {
 
 export function PlaygroundSkeleton() {
   return (
-    <div className="flex flex-col h-dvh bg-background relative">
+    <div className="flex flex-col h-dvh bg-background relative overflow-hidden">
       {/* Header skeleton */}
       <div className="shrink-0 px-3 pt-3 md:px-4 md:pt-4 z-20 relative">
         <div className="bg-card/80 border border-border/60 rounded-2xl">
@@ -54,29 +54,33 @@ export function PlaygroundSkeleton() {
         </div>
       </div>
 
-      {/* Full screen chat skeleton (behind header + input) */}
-      <div className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-5 px-6 md:px-16">
-        <Bone className="h-10 w-3/4 md:w-1/3 rounded-2xl self-end" />
-        <Bone className="h-24 w-full md:w-2/3 rounded-2xl self-start" />
-        <Bone className="h-10 w-2/3 md:w-1/4 rounded-2xl self-end" />
-        <Bone className="h-16 w-full md:w-1/2 rounded-2xl self-start" />
+      {/* Panels Skeleton (Desktop: 2 columns, Mobile: 1 centered) */}
+      <div className="flex-1 w-full px-0 md:px-0 pt-0 pb-0 overflow-hidden relative z-0">
+        <div className="h-full w-full flex items-start">
+          {/* Panel 1 */}
+          <div className="flex-1 h-full border-r border-border/30 p-4 pb-32 flex flex-col gap-6 opacity-40 md:opacity-100">
+            <div className="flex flex-col gap-3 mt-10">
+              <Bone className="h-10 w-3/4 self-end rounded-2xl rounded-tr-sm" />
+              <Bone className="h-24 w-full self-start rounded-2xl rounded-tl-sm" />
+              <Bone className="h-8 w-1/2 self-end rounded-2xl rounded-tr-sm" />
+            </div>
+          </div>
+          {/* Panel 2 (Desktop only) - Last one has no border-r */}
+          <div className="hidden md:flex flex-1 h-full p-4 pb-32 flex-col gap-6">
+            <div className="flex flex-col gap-3 mt-20">
+              <Bone className="h-12 w-2/3 self-end rounded-2xl rounded-tr-sm" />
+              <Bone className="h-32 w-full self-start rounded-2xl rounded-tl-sm" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Input skeleton */}
-      <div className="shrink-0 relative z-20 bg-gradient-to-t from-background via-background/90 to-transparent pt-8 md:pt-6">
-        <div className="px-4 pb-4 max-w-3xl mx-auto">
-          <div className="bg-card border-2 border-border rounded-[28px] px-6 py-4">
-            <Bone className="h-5 w-40 mb-3" />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Bone className="h-8 w-28 rounded-xl" />
-                <Bone className="h-8 w-20 rounded-xl md:hidden" />
-              </div>
-              <Bone className="h-10 w-10 rounded-full" />
-            </div>
+      {/* Input skeleton (Overlay) */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 pt-16 pb-6 px-4 bg-gradient-to-t from-background from-45% via-background/90 to-transparent">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-card border-2 border-border rounded-[28px] px-6 py-4 flex items-center justify-between shadow-sm">
+            <Bone className="h-5 w-40" />
+            <Bone className="h-9 w-9 rounded-full" />
           </div>
         </div>
       </div>

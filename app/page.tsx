@@ -7,7 +7,11 @@ import { MessageInput } from "@/components/message-input"
 import { PlaygroundSkeleton } from "@/components/playground-skeleton"
 import { usePlayground } from "@/hooks/use-playground"
 import { useTemplates } from "@/hooks/use-templates"
+import {
+  getAllProviders
+} from "@/lib/ai-providers/registry"
 import { cn } from "@/lib/utils"
+import { useMemo } from "react"
 
 export default function PlaygroundPage() {
   const {
@@ -26,12 +30,44 @@ export default function PlaygroundPage() {
     resetSystemPrompts,
     clearEverything,
     sendMessage,
+    updatePanelConfig,
+    updateActiveProvider,
+    updateProviderConfig,
+    updateProviderModels,
+    togglePanelMode,
   } = usePlayground()
 
   const templateStore = useTemplates()
 
   const isAnyPanelLoading = panels.some((p) => p.isLoading)
   const count = settings.panelCount
+
+  // Check if current provider has API key
+  const currentProviderConfig = settings.providerConfigs?.[settings.activeProviderId]
+  const hasApiKey = !!currentProviderConfig?.apiKey
+
+  // Get available models for active provider
+  const activeProvider = getAllProviders().find(p => p.id === settings.activeProviderId)
+  const availableModels = (settings.providerConfigs?.[settings.activeProviderId]?.models || activeProvider?.models || []).map(m => ({
+    id: m.id,
+    label: m.label || m.id, // Ensure label exists
+    description: m.description
+  }))
+
+  const effectiveProviders = useMemo(() => {
+    return getAllProviders().map(p => {
+      const dynamic = settings.providerConfigs?.[p.id]?.models
+      return {
+        id: p.id,
+        name: p.name,
+        models: (dynamic && dynamic.length > 0 ? dynamic : p.models).map(m => ({
+          id: m.id,
+          label: m.label || m.id,
+          description: m.description
+        }))
+      }
+    })
+  }, [settings.providerConfigs])
 
   /* ---- Mobile scroll-snap navigation ---- */
   const [activeIndex, setActiveIndex] = useState(0)
@@ -94,19 +130,7 @@ export default function PlaygroundPage() {
           onClearApiKey={clearApiKey}
           onResetPrompts={resetSystemPrompts}
           onClearEverything={clearEverything}
-          mobilePromptOpen={mobilePromptOpen}
           setMobilePromptOpen={setMobilePromptOpen}
-          mobilePanel={currentMobilePanel}
-          onUpdateMobileSystemPrompt={
-            currentMobilePanel
-              ? (prompt: string) => updateSystemPrompt(currentMobilePanel.id, prompt)
-              : undefined
-          }
-          onUpdateMobileTitle={
-            currentMobilePanel
-              ? (title: string) => updatePanelTitle(currentMobilePanel.id, title)
-              : undefined
-          }
           templates={templateStore.templates}
           onApplyTemplate={
             currentMobilePanel
@@ -114,6 +138,10 @@ export default function PlaygroundPage() {
               : undefined
           }
           templateStore={templateStore}
+          updateActiveProvider={updateActiveProvider}
+          updateProviderConfig={updateProviderConfig}
+          updateProviderModels={updateProviderModels}
+          togglePanelMode={togglePanelMode}
         />
       </div>
 
@@ -147,10 +175,13 @@ export default function PlaygroundPage() {
                   onUpdateTitle={(title) =>
                     updatePanelTitle(panel.id, title)
                   }
+                  onUpdateConfig={(config) => updatePanelConfig(panel.id, config)}
+                  enablePanelMode={settings.enablePanelMode}
                   templates={templateStore.templates}
                   onApplyTemplate={(content) =>
                     updateSystemPrompt(panel.id, content)
                   }
+                  availableProviders={effectiveProviders}
                 />
               </div>
             ))}
@@ -178,13 +209,14 @@ export default function PlaygroundPage() {
         </div>
       )}
 
-      {/* Global Input */}
-      <div className="relative z-20 shrink-0">
+      {/* Global Input (Overlay) */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
         <MessageInput
           onSend={sendMessage}
-          disabled={!settings.apiKey.trim()}
+          disabled={!hasApiKey}
           isAnyPanelLoading={isAnyPanelLoading}
-          model={settings.model}
+          model={settings.activeModelId}
+          availableModels={availableModels}
           onUpdateModel={updateModel}
           draft={draft}
           setDraft={setDraft}
@@ -192,17 +224,18 @@ export default function PlaygroundPage() {
           onUpdateMobileSystemPrompt={
             currentMobilePanel
               ? (prompt: string) =>
-                  updateSystemPrompt(currentMobilePanel.id, prompt)
+                updateSystemPrompt(currentMobilePanel.id, prompt)
               : undefined
           }
           onUpdateMobileTitle={
             currentMobilePanel
               ? (title: string) =>
-                  updatePanelTitle(currentMobilePanel.id, title)
+                updatePanelTitle(currentMobilePanel.id, title)
               : undefined
           }
           mobilePromptOpen={mobilePromptOpen}
           setMobilePromptOpen={setMobilePromptOpen}
+          enablePanelMode={settings.enablePanelMode}
         />
       </div>
     </div>

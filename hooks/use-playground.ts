@@ -1,12 +1,9 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import type {
-  PlaygroundSettings,
-  PanelState,
-  ChatMessage,
-  ModelId,
-} from "@/lib/types"
+import { type PlaygroundSettings, type PanelState, type ChatMessage } from "@/lib/types"
+import { getProvider, getAllProviders, PROVIDER_REGISTRY, LONGCAT_PROVIDER } from "@/lib/ai-providers/registry"
+import type { ProviderConfig } from "@/lib/ai-providers/types"
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 const STORAGE_KEY_SETTINGS = "longcat-settings"
@@ -107,12 +104,12 @@ async function* parseSSEStream(
           : ""
         const thinking = delta
           ? (typeof delta.thinking === "string"
-              ? delta.thinking
-              : typeof delta.reasoning_content === "string"
-                ? delta.reasoning_content
-                : typeof delta.reasoning === "string"
-                  ? delta.reasoning
-                  : "")
+            ? delta.thinking
+            : typeof delta.reasoning_content === "string"
+              ? delta.reasoning_content
+              : typeof delta.reasoning === "string"
+                ? delta.reasoning
+                : "")
           : ""
 
         if (content || thinking || usage) {
@@ -142,7 +139,7 @@ async function* parseSSEStream(
         const thinking = delta
           ? (typeof delta.thinking === "string" ? delta.thinking
             : typeof delta.reasoning_content === "string" ? delta.reasoning_content
-            : typeof delta.reasoning === "string" ? delta.reasoning : "")
+              : typeof delta.reasoning === "string" ? delta.reasoning : "")
           : ""
         if (content || thinking || usage) {
           yield {
@@ -165,9 +162,14 @@ async function* parseSSEStream(
 /* ------------------------------------------------------------------ */
 
 const DEFAULT_SETTINGS: PlaygroundSettings = {
-  apiKey: "",
-  model: "LongCat-Flash-Lite",
+  activeProviderId: LONGCAT_PROVIDER.id,
+  activeModelId: LONGCAT_PROVIDER.models[0].id,
   panelCount: 2,
+  enablePanelMode: false,
+  providerConfigs: {},
+  // Legacy
+  apiKey: "",
+  model: "",
 }
 
 const DEFAULT_PANELS: PanelState[] = [
@@ -189,11 +191,50 @@ export function usePlayground() {
   const [draft, setDraft] = useState("")
   const [hydrated, setHydrated] = useState(false)
 
+  // Security warning check (could be extended)
+  const isLocalStorageAvailable = typeof window !== "undefined"
+
   useEffect(() => {
-    const savedSettings = loadFromStorage<PlaygroundSettings>(
+    // Explicitly loading as partial and merging to ensure structure consistency
+    const rawSettings = loadFromStorage<PlaygroundSettings>(
       STORAGE_KEY_SETTINGS,
       DEFAULT_SETTINGS
     )
+
+    // Ensure merged structure has providerConfigs even if rawSettings (old cache) missed it
+    const savedSettings: PlaygroundSettings = {
+      ...DEFAULT_SETTINGS,
+      ...rawSettings,
+      providerConfigs: rawSettings.providerConfigs || {}
+    }
+
+    // Migration: If legacy settings exist (apiKey, model) but no providerConfigs, migrate them
+    // This assumes the legacy settings were for Longcat
+    if (savedSettings.apiKey && (!savedSettings.providerConfigs || Object.keys(savedSettings.providerConfigs).length === 0)) {
+      savedSettings.providerConfigs = {
+        [LONGCAT_PROVIDER.id]: { apiKey: savedSettings.apiKey }
+      }
+      savedSettings.activeProviderId = LONGCAT_PROVIDER.id
+      // Handle migration of model name
+      const provider = getProvider(savedSettings.activeProviderId)
+      if (provider) {
+        // If activeModelId is not valid for new provider, reset
+        const modelExists = provider.models.some(m => m.id === savedSettings.activeModelId)
+        if (!modelExists) {
+          // If legacy model id matches one of the new models?
+          // Or just force default
+          savedSettings.activeModelId = provider.models[0].id
+        }
+      }
+    }
+
+    // Default active provider/model if missing or invalid
+    if (!savedSettings.activeProviderId || !getProvider(savedSettings.activeProviderId)) {
+      savedSettings.activeProviderId = LONGCAT_PROVIDER.id
+      // Fallback model ID if not found
+      savedSettings.activeModelId = getProvider(LONGCAT_PROVIDER.id)?.models[0].id || "gpt-4o"
+    }
+
     const savedPanels = loadFromStorage<PanelState[]>(
       STORAGE_KEY_PANELS,
       DEFAULT_PANELS
@@ -256,15 +297,81 @@ export function usePlayground() {
     setSettings((prev) => ({ ...prev, panelCount: count }))
   }, [])
 
+  const togglePanelMode = useCallback((enabled: boolean) => {
+    setSettings((prev) => ({ ...prev, enablePanelMode: enabled }))
+  }, [])
+
+  // Legacy compatibility: Updates active provider's API key
   const updateApiKey = useCallback((apiKey: string) => {
-    setSettings((prev) => ({ ...prev, apiKey }))
+    setSettings((prev) => {
+      const providerId = prev.activeProviderId
+      const currentConfigs = prev.providerConfigs || {} // Safeguard
+      return {
+        ...prev,
+        providerConfigs: {
+          ...currentConfigs,
+          [providerId]: {
+            ...currentConfigs[providerId],
+            apiKey
+          }
+        },
+        // Update legacy field just in case
+        apiKey
+      }
+    })
   }, [])
 
-  const updateModel = useCallback((model: ModelId) => {
-    setSettings((prev) => ({ ...prev, model }))
+  // Updates active model (must belong to active provider or be valid)
+  const updateModel = useCallback((modelId: string) => {
+    setSettings((prev) => ({ ...prev, activeModelId: modelId }))
   }, [])
 
+  const updateActiveProvider = useCallback((providerId: string) => {
+    const provider = getProvider(providerId)
+    if (!provider) return
 
+    setSettings((prev) => ({
+      ...prev,
+      activeProviderId: providerId,
+      // Reset/Update active model to first available model of new provider
+      activeModelId: provider.models[0].id
+    }))
+  }, [])
+
+  // Updated to include organizationId
+  const updateProviderConfig = useCallback((providerId: string, config: { apiKey?: string; baseUrl?: string; organizationId?: string; enabled?: boolean }) => {
+    setSettings((prev) => {
+      const currentConfigs = prev.providerConfigs || {} // Safeguard
+      return {
+        ...prev,
+        providerConfigs: {
+          ...currentConfigs,
+          [providerId]: {
+            ...currentConfigs[providerId],
+            ...config
+          }
+        }
+      }
+    })
+  }, [])
+
+  // New action to update fetched models
+  const updateProviderModels = useCallback((providerId: string, models: { id: string; label: string; description?: string }[]) => {
+    setSettings((prev) => {
+      const currentConfigs = prev.providerConfigs || {}
+      return {
+        ...prev,
+        providerConfigs: {
+          ...currentConfigs,
+          [providerId]: {
+            ...currentConfigs[providerId],
+            models,
+            lastFetched: Date.now()
+          }
+        }
+      }
+    })
+  }, [])
 
   const updatePanelTitle = useCallback(
     (panelId: number, title: string) => {
@@ -275,6 +382,7 @@ export function usePlayground() {
     []
   )
 
+  // Update panel system prompt
   const updateSystemPrompt = useCallback(
     (panelId: number, prompt: string) => {
       setPanels((prev) =>
@@ -283,6 +391,35 @@ export function usePlayground() {
     },
     []
   )
+
+  // Update panel-specific provider/model
+  const updatePanelConfig = useCallback((panelId: number, config: { providerId?: string, modelId?: string }) => {
+    setPanels((prev) =>
+      prev.map((p) => {
+        if (p.id !== panelId) return p
+
+        const updates: Partial<PanelState> = {}
+
+        if (config.providerId) {
+          updates.providerId = config.providerId
+          // Reset model if provider changes, or ensure it's valid
+          const provider = getProvider(config.providerId)
+          if (provider) {
+            // If modelId is not provided, default to first model of new provider
+            if (!config.modelId) {
+              updates.modelId = provider.models[0].id
+            }
+          }
+        }
+
+        if (config.modelId) {
+          updates.modelId = config.modelId
+        }
+
+        return { ...p, ...updates }
+      })
+    )
+  }, [])
 
   /* ------ Delete operations ------ */
 
@@ -295,7 +432,21 @@ export function usePlayground() {
   }, [])
 
   const clearApiKey = useCallback(() => {
-    setSettings((prev) => ({ ...prev, apiKey: "" }))
+    setSettings((prev) => {
+      const providerId = prev.activeProviderId
+      const currentConfigs = prev.providerConfigs || {}
+      return {
+        ...prev,
+        providerConfigs: {
+          ...currentConfigs,
+          [providerId]: {
+            ...currentConfigs[providerId],
+            apiKey: ""
+          }
+        },
+        apiKey: ""
+      }
+    })
   }, [])
 
   const resetSystemPrompts = useCallback(() => {
@@ -324,7 +475,9 @@ export function usePlayground() {
   const sendMessage = useCallback(
     async (userMessage: string) => {
       const snap = settingsRef.current
-      if (!userMessage.trim() || !snap.apiKey.trim()) return
+
+      // Basic validation
+      if (!userMessage.trim()) return
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -352,24 +505,71 @@ export function usePlayground() {
 
       const promises = currentPanelSnapshots.map(async (panelSnapshot) => {
         const panelId = panelSnapshot.id
+
+        // Determine effective provider and model for this panel
+        let effectiveProviderId = currentSettings.activeProviderId
+        let effectiveModelId = currentSettings.activeModelId
+
+        if (currentSettings.enablePanelMode) {
+          effectiveProviderId = panelSnapshot.providerId || currentSettings.activeProviderId
+          effectiveModelId = panelSnapshot.modelId || currentSettings.activeModelId
+
+          // Fallback validation: ensure model belongs to provider?
+          // For now, trust the state or simple sync.
+          // Ideally, if panel.providerId is set but modelId isn't, use default of that provider
+          if (panelSnapshot.providerId && !panelSnapshot.modelId) {
+            const p = getProvider(panelSnapshot.providerId)
+            if (p) effectiveModelId = p.models[0].id
+          }
+        }
+
+        // Get config for the effective provider
+        const currentConfigs = currentSettings.providerConfigs || {}
+        const currentProviderConfig = currentConfigs[effectiveProviderId]
+        const apiKey = currentProviderConfig?.apiKey || ""
+
+        if (!apiKey) {
+          // Error for this panel specifically
+          setPanels((prev) =>
+            prev.map((p) =>
+              p.id === panelId
+                ? {
+                  ...p,
+                  isLoading: false,
+                  messages: [
+                    ...p.messages,
+                    {
+                      id: generateId(),
+                      role: "assistant",
+                      content: `Error: API Key missing for provider ${effectiveProviderId}`,
+                      isStreaming: false
+                    }
+                  ]
+                }
+                : p
+            )
+          )
+          return
+        }
+
         const assistantMsgId = generateId()
 
         setPanels((prev) =>
           prev.map((p) =>
             p.id === panelId
               ? {
-                  ...p,
-                  messages: [
-                    ...p.messages,
-                    {
-                      id: assistantMsgId,
-                      role: "assistant" as const,
-                      content: "",
-                      thinking: "",
-                      isStreaming: true,
-                    },
-                  ],
-                }
+                ...p,
+                messages: [
+                  ...p.messages,
+                  {
+                    id: assistantMsgId,
+                    role: "assistant" as const,
+                    content: "",
+                    thinking: "",
+                    isStreaming: true,
+                  },
+                ],
+              }
               : p
           )
         )
@@ -386,15 +586,21 @@ export function usePlayground() {
             { role: "user" as const, content: userMessage },
           ]
 
+          // Send provider context to API
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              apiKey: currentSettings.apiKey,
-              model: currentSettings.model,
+              providerId: effectiveProviderId,
+              providerConfig: {
+                apiKey: apiKey,
+                baseUrl: currentProviderConfig?.baseUrl, // Optional override
+                organizationId: currentProviderConfig?.organizationId, // Optional
+              },
+              model: effectiveModelId,
               systemPrompt: panelSnapshot.systemPrompt,
               messages: messagesForApi,
-              enableThinking: currentSettings.model.toLowerCase().includes("thinking"),
+              enableThinking: effectiveModelId.toLowerCase().includes("thinking"),
             }),
             signal: abortController.signal,
           })
@@ -430,18 +636,18 @@ export function usePlayground() {
               prev.map((p) =>
                 p.id === panelId
                   ? {
-                      ...p,
-                      messages: p.messages.map((m) =>
-                        m.id === assistantMsgId
-                          ? {
-                              ...m,
-                              content: contentNow,
-                              thinking: thinkingNow || undefined,
-                              isStreaming: true,
-                            }
-                          : m
-                      ),
-                    }
+                    ...p,
+                    messages: p.messages.map((m) =>
+                      m.id === assistantMsgId
+                        ? {
+                          ...m,
+                          content: contentNow,
+                          thinking: thinkingNow || undefined,
+                          isStreaming: true,
+                        }
+                        : m
+                    ),
+                  }
                   : p
               )
             )
@@ -457,20 +663,20 @@ export function usePlayground() {
             prev.map((p) =>
               p.id === panelId
                 ? {
-                    ...p,
-                    isLoading: false,
-                    messages: p.messages.map((m) =>
-                      m.id === assistantMsgId
-                        ? {
-                            ...m,
-                            content: finalContent,
-                            thinking: finalThinking || undefined,
-                            isStreaming: false,
-                            tokenUsage: finalUsage,
-                          }
-                        : m
-                    ),
-                  }
+                  ...p,
+                  isLoading: false,
+                  messages: p.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                        ...m,
+                        content: finalContent,
+                        thinking: finalThinking || undefined,
+                        isStreaming: false,
+                        tokenUsage: finalUsage,
+                      }
+                      : m
+                  ),
+                }
                 : p
             )
           )
@@ -484,18 +690,18 @@ export function usePlayground() {
             prev.map((p) =>
               p.id === panelId
                 ? {
-                    ...p,
-                    isLoading: false,
-                    messages: p.messages.map((m) =>
-                      m.id === assistantMsgId
-                        ? {
-                            ...m,
-                            content: `Error: ${errorMessage}`,
-                            isStreaming: false,
-                          }
-                        : m
-                    ),
-                  }
+                  ...p,
+                  isLoading: false,
+                  messages: p.messages.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                        ...m,
+                        content: `Error: ${errorMessage}`,
+                        isStreaming: false,
+                      }
+                      : m
+                  ),
+                }
                 : p
             )
           )
@@ -516,15 +722,21 @@ export function usePlayground() {
     draft,
     setDraft,
     hydrated,
-    updateApiKey,
+    updateApiKey, // Legacy/Current Provider
     updateModel,
+    updateActiveProvider,
+    updateProviderConfig,
+    updateProviderModels,
     updatePanelCount,
     updatePanelTitle,
     updateSystemPrompt,
+    togglePanelMode,
+    updatePanelConfig,
     clearAllChats,
     clearApiKey,
     resetSystemPrompts,
     clearEverything,
     sendMessage,
+    isLocalStorageAvailable
   }
 }

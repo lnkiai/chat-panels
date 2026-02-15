@@ -71,5 +71,9 @@ export function useTemplates() {
     setTemplates((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  return { templates, addTemplate, updateTemplate, deleteTemplate }
+  const clearTemplates = useCallback(() => {
+    setTemplates([])
+  }, [])
+
+  return { templates, addTemplate, updateTemplate, deleteTemplate, clearTemplates }
 }

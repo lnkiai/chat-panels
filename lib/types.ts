@@ -1,7 +1,6 @@
-export type ModelId =
-  | "LongCat-Flash-Lite"
-  | "LongCat-Flash-Chat"
-  | "LongCat-Flash-Thinking-2601"
+import type { ProviderConfig } from "./ai-providers/types"
+
+export type ModelId = string
 
 export interface TokenUsage {
   prompt: number
@@ -36,28 +35,36 @@ export interface PanelState {
   systemPrompt: string
   messages: ChatMessage[]
   isLoading: boolean
+  // Panel-specific overrides
+  providerId?: string
+  modelId?: string
 }
 
 export interface PlaygroundSettings {
-  apiKey: string
-  model: ModelId
+  // Global
   panelCount: number
+  enablePanelMode: boolean
+
+
+  // Provider Selection
+  activeProviderId: string
+  activeModelId: string
+
+  // Per-Provider Configs (Keyed by Provider ID)
+  // These configs override defaults or store sensitive info like API Keys.
+  providerConfigs: Record<string, {
+    apiKey?: string
+    baseUrl?: string
+    organizationId?: string
+    enabled?: boolean
+    models?: { id: string; label: string; description?: string }[]
+    lastFetched?: number
+  }>
+
+  // Legacy fields for backward compatibility/migration
+  apiKey?: string
+  model?: string
 }
 
-export const MODELS: { id: ModelId; label: string; description: string }[] = [
-  {
-    id: "LongCat-Flash-Lite",
-    label: "Flash-Lite",
-    description: "High-speed / Lightweight / 320K tokens",
-  },
-  {
-    id: "LongCat-Flash-Chat",
-    label: "Flash-Chat",
-    description: "General purpose / 256K tokens",
-  },
-  {
-    id: "LongCat-Flash-Thinking-2601",
-    label: "Flash-Thinking-2601",
-    description: "Deep reasoning / Agent / 256K tokens",
-  },
-]
+// Deprecated: Use registry instead. Kept empty to avoid type errors in legacy imports until fully refactored.
+export const MODELS: { id: string; label: string; description: string }[] = []
