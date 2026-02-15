@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   Type,
+  PanelLeft,
 } from "lucide-react"
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
@@ -36,6 +37,7 @@ interface HeaderBarProps {
   mobilePanel?: PanelState
   onUpdateMobileSystemPrompt?: (prompt: string) => void
   onUpdateMobileTitle?: (title: string) => void
+  onOpenSidebar?: () => void
 }
 
 /* ------------------------------------------------------------------ */
@@ -228,6 +230,7 @@ export function HeaderBar({
   mobilePanel,
   onUpdateMobileSystemPrompt,
   onUpdateMobileTitle,
+  onOpenSidebar,
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -274,12 +277,23 @@ export function HeaderBar({
   const manageCurrentTab = MANAGE_TABS.find((t) => t.id === manageSelected)!
 
   return (
-    <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4 md:pb-0 z-30 relative">
+    <div className="shrink-0 px-3 pt-3 pb-0 md:px-4 md:pt-4 md:pb-0 z-20 relative">
       <header className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl">
         {/* Desktop layout */}
         <div className="hidden md:flex items-center justify-between px-5 h-14">
-          <div className="flex items-center shrink-0">
-            <div className="h-7 w-7 rounded-xl bg-card flex items-center justify-center mr-2.5 border border-border/60 overflow-hidden">
+          <div className="flex items-center shrink-0 gap-2">
+            {onOpenSidebar && (
+              <motion.button
+                onClick={onOpenSidebar}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="h-8 w-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </motion.button>
+            )}
+            <div className="h-7 w-7 rounded-xl bg-card flex items-center justify-center border border-border/60 overflow-hidden">
               <Image src="/images/longcat-color.svg" alt="Longcat" width={20} height={20} className="h-5 w-5" />
             </div>
             <h1 className="text-sm font-heading tracking-tight text-foreground">
@@ -328,8 +342,19 @@ export function HeaderBar({
 
         {/* Mobile layout */}
         <div className="flex md:hidden items-center justify-between px-3 h-12">
-          <div className="flex items-center">
-            <div className="h-6 w-6 rounded-lg bg-card flex items-center justify-center mr-2 border border-border/60 overflow-hidden">
+          <div className="flex items-center gap-1.5">
+            {onOpenSidebar && (
+              <motion.button
+                onClick={onOpenSidebar}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.85 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary transition-colors"
+              >
+                <PanelLeft className="h-3.5 w-3.5" />
+              </motion.button>
+            )}
+            <div className="h-6 w-6 rounded-lg bg-card flex items-center justify-center border border-border/60 overflow-hidden">
               <Image src="/images/longcat-color.svg" alt="Longcat" width={16} height={16} className="h-4 w-4" />
             </div>
             <h1 className="text-sm font-heading tracking-tight text-foreground">

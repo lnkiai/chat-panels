@@ -3,12 +3,31 @@ export type ModelId =
   | "LongCat-Flash-Chat"
   | "LongCat-Flash-Thinking-2601"
 
+export interface TokenUsage {
+  prompt: number
+  completion: number
+  total: number
+}
+
 export interface ChatMessage {
   id: string
   role: "user" | "assistant"
   content: string
   thinking?: string
   isStreaming?: boolean
+  tokenUsage?: TokenUsage
+}
+
+/* ------------------------------------------------------------------ */
+/*  Prompt Templates                                                   */
+/* ------------------------------------------------------------------ */
+
+export interface PromptTemplate {
+  id: string
+  name: string
+  content: string
+  createdAt: number
+  updatedAt: number
 }
 
 export interface PanelState {

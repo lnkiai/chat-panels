@@ -14,7 +14,7 @@ import { TextShimmer } from "@/components/core/text-shimmer"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
-import type { PanelState } from "@/lib/types"
+import type { PanelState, ChatMessage } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
@@ -23,14 +23,12 @@ interface ChatPanelProps {
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
   onUpdateTitle: (title: string) => void
-  isMobileFullscreen?: boolean
 }
 
 export function ChatPanel({
   panel,
   onUpdateSystemPrompt,
   onUpdateTitle,
-  isMobileFullscreen,
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -51,7 +49,6 @@ export function ChatPanel({
     if (atBottom) setHasNewMessages(false)
   }, [])
 
-  // Detect new messages
   useEffect(() => {
     const currentCount = panel.messages.length
     if (currentCount > prevMsgCountRef.current && !isAtBottom) {
@@ -60,7 +57,6 @@ export function ChatPanel({
     prevMsgCountRef.current = currentCount
   }, [panel.messages.length, isAtBottom])
 
-  // Auto-scroll to bottom when user is already at bottom
   useEffect(() => {
     if (isAtBottom && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -95,17 +91,9 @@ export function ChatPanel({
   }
 
   return (
-    <div
-      className={cn(
-        "flex flex-col h-full min-w-0 overflow-hidden",
-        isMobileFullscreen
-          ? "bg-background rounded-none border-none"
-          : "bg-card rounded-2xl border border-border/60"
-      )}
-    >
-      {/* Panel header - hidden on mobile fullscreen (system prompt is in input bar) */}
-      {isMobileFullscreen ? null : (
-      <div className="shrink-0">
+    <div className="flex flex-col h-full min-w-0 overflow-hidden bg-background border-r border-border/20 last:border-r-0">
+      {/* Panel header - visible on desktop only; mobile uses header-bar system prompt */}
+      <div className="shrink-0 hidden md:block">
         <div className="flex items-center w-full px-3.5 py-2.5">
           <motion.button
             onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
@@ -185,16 +173,12 @@ export function ChatPanel({
 
         <div className="h-px bg-border/40 mx-3" />
       </div>
-      )}
 
       {/* Messages area */}
       <div
         ref={scrollRef}
         onScroll={checkIfAtBottom}
-        className={cn(
-          "flex-1 overflow-y-auto min-h-0 custom-scrollbar relative",
-          isMobileFullscreen ? "bg-background" : "bg-background/40"
-        )}
+        className="flex-1 overflow-y-auto min-h-0 custom-scrollbar relative"
       >
         {panel.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -203,10 +187,7 @@ export function ChatPanel({
             </p>
           </div>
         ) : (
-          <div className={cn(
-            "px-3 flex flex-col gap-3",
-            isMobileFullscreen ? "pt-20 pb-48" : "py-3"
-          )}>
+          <div className="px-3 md:px-4 flex flex-col gap-3 pt-20 pb-44 md:pt-16 md:pb-28">
             {panel.messages.map((message, i) => (
               <MessageBubble
                 key={message.id}
@@ -226,20 +207,15 @@ export function ChatPanel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className={cn(
-              "flex justify-center pointer-events-none",
-              isMobileFullscreen
-                ? "absolute left-0 right-0 bottom-52 z-30"
-                : "shrink-0 py-1"
-            )}
+            className="absolute left-0 right-0 bottom-48 md:bottom-24 z-30 flex justify-center pointer-events-none"
           >
             <button
               onClick={scrollToBottom}
               className={cn(
-                "pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                "pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border shadow-sm",
                 hasNewMessages
                   ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-white/90 text-muted-foreground border-border/50 hover:text-foreground"
+                  : "bg-card/90 backdrop-blur-sm text-muted-foreground border-border/50 hover:text-foreground"
               )}
             >
               <ChevronDown className="h-3 w-3" />
@@ -260,7 +236,7 @@ function MessageBubble({
   message,
   isLast,
 }: {
-  message: PanelState["messages"][number]
+  message: ChatMessage
   isLast: boolean
 }) {
   if (message.role === "user") {
@@ -322,7 +298,7 @@ function UserBubble({ content }: { content: string }) {
               "shrink-0 flex items-center gap-1 h-7 px-2 rounded-lg border text-[11px] transition-colors",
               copied
                 ? "bg-primary/10 border-primary/20 text-primary"
-                : "bg-white/90 border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                : "bg-card/90 border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             {copied ? (
@@ -357,7 +333,7 @@ function AssistantMessage({
   message,
   isLast,
 }: {
-  message: PanelState["messages"][number]
+  message: ChatMessage
   isLast: boolean
 }) {
   return (
@@ -398,26 +374,28 @@ function AssistantMessage({
       </div>
 
       {message.content.trim() && !message.isStreaming && (
-        <AssistantStatsBar content={message.content} />
+        <AssistantStatsBar message={message} />
       )}
     </motion.div>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Assistant stats bar                                                */
+/*  Assistant stats bar (with real token usage)                        */
 /* ------------------------------------------------------------------ */
 
-function AssistantStatsBar({ content }: { content: string }) {
+function AssistantStatsBar({ message }: { message: ChatMessage }) {
   const [copied, setCopied] = useState(false)
-  const charCount = content.length
+  const charCount = message.content.length
   const tokenEstimate = Math.ceil(charCount / 3)
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(content)
+    navigator.clipboard.writeText(message.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }, [content])
+  }, [message.content])
+
+  const usage = message.tokenUsage
 
   return (
     <div className="mt-2 flex items-center gap-2">
@@ -450,9 +428,18 @@ function AssistantStatsBar({ content }: { content: string }) {
           <Type className="h-2.5 w-2.5" />
           {charCount.toLocaleString()} {"chars"}
         </span>
-        <span>
-          {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
-        </span>
+        {usage ? (
+          <>
+            <span>{usage.completion.toLocaleString()} {"tokens"}</span>
+            <span className="text-muted-foreground/30">
+              {"(prompt: "}{usage.prompt.toLocaleString()}{" / total: "}{usage.total.toLocaleString()}{")"}
+            </span>
+          </>
+        ) : (
+          <span>
+            {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -514,7 +501,7 @@ function PromptStatsBar({ content }: { content: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Thinking block - defaults CLOSED, opens only during streaming      */
+/*  Thinking block                                                     */
 /* ------------------------------------------------------------------ */
 
 function ThinkingBlock({
@@ -524,16 +511,13 @@ function ThinkingBlock({
   thinking: string
   isStreaming: boolean
 }) {
-  // Default to false (closed). Only auto-open when streaming starts.
   const [isOpen, setIsOpen] = useState(false)
   const wasStreamingRef = useRef(false)
 
   useEffect(() => {
-    // When streaming starts (was false -> now true), auto-open
     if (!wasStreamingRef.current && isStreaming) {
       setIsOpen(true)
     }
-    // When streaming stops (was true -> now false), auto-close
     if (wasStreamingRef.current && !isStreaming) {
       setIsOpen(false)
     }

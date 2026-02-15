@@ -68,9 +68,15 @@ function removeFromStorage(key: string) {
 /*  SSE parser                                                         */
 /* ------------------------------------------------------------------ */
 
+interface SSEDelta {
+  content: string
+  thinking: string
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+}
+
 async function* parseSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>
-): AsyncGenerator<{ content: string; thinking: string }> {
+): AsyncGenerator<SSEDelta> {
   const decoder = new TextDecoder()
   let buffer = ""
 
@@ -94,21 +100,28 @@ async function* parseSSEStream(
       try {
         const parsed = JSON.parse(jsonStr)
         const delta = parsed.choices?.[0]?.delta
+        const usage = parsed.usage
 
-        if (delta) {
-          const content =
-            typeof delta.content === "string" ? delta.content : ""
-          const thinking =
-            typeof delta.thinking === "string"
+        const content = delta
+          ? typeof delta.content === "string" ? delta.content : ""
+          : ""
+        const thinking = delta
+          ? (typeof delta.thinking === "string"
               ? delta.thinking
               : typeof delta.reasoning_content === "string"
                 ? delta.reasoning_content
                 : typeof delta.reasoning === "string"
                   ? delta.reasoning
-                  : ""
+                  : "")
+          : ""
 
-          if (content || thinking) {
-            yield { content, thinking }
+        if (content || thinking || usage) {
+          yield {
+            content,
+            thinking,
+            usage: usage
+              ? { prompt_tokens: usage.prompt_tokens ?? 0, completion_tokens: usage.completion_tokens ?? 0, total_tokens: usage.total_tokens ?? 0 }
+              : undefined,
           }
         }
       } catch {
@@ -124,19 +137,20 @@ async function* parseSSEStream(
       try {
         const parsed = JSON.parse(jsonStr)
         const delta = parsed.choices?.[0]?.delta
-        if (delta) {
-          const content =
-            typeof delta.content === "string" ? delta.content : ""
-          const thinking =
-            typeof delta.thinking === "string"
-              ? delta.thinking
-              : typeof delta.reasoning_content === "string"
-                ? delta.reasoning_content
-                : typeof delta.reasoning === "string"
-                  ? delta.reasoning
-                  : ""
-          if (content || thinking) {
-            yield { content, thinking }
+        const usage = parsed.usage
+        const content = delta ? (typeof delta.content === "string" ? delta.content : "") : ""
+        const thinking = delta
+          ? (typeof delta.thinking === "string" ? delta.thinking
+            : typeof delta.reasoning_content === "string" ? delta.reasoning_content
+            : typeof delta.reasoning === "string" ? delta.reasoning : "")
+          : ""
+        if (content || thinking || usage) {
+          yield {
+            content,
+            thinking,
+            usage: usage
+              ? { prompt_tokens: usage.prompt_tokens ?? 0, completion_tokens: usage.completion_tokens ?? 0, total_tokens: usage.total_tokens ?? 0 }
+              : undefined,
           }
         }
       } catch {
@@ -325,8 +339,6 @@ export function usePlayground() {
         .slice(0, currentSettings.panelCount)
         .map((p) => ({ ...p }))
 
-      console.log("[v0] sendMessage: captured", currentPanelSnapshots.length, "panels, IDs:", currentPanelSnapshots.map(p => p.id))
-
       if (currentPanelSnapshots.length === 0) return
 
       // Add user message + set loading
@@ -374,7 +386,6 @@ export function usePlayground() {
             { role: "user" as const, content: userMessage },
           ]
 
-          console.log("[v0] Fetching for panel", panelId, "model:", currentSettings.model, "messages:", messagesForApi.length)
           const response = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -388,7 +399,6 @@ export function usePlayground() {
             signal: abortController.signal,
           })
 
-          console.log("[v0] Response status for panel", panelId, ":", response.status, response.ok)
           if (!response.ok) {
             const errorText = await response.text()
             let errorMessage = `API error: ${response.status}`
@@ -406,14 +416,12 @@ export function usePlayground() {
 
           let accContent = ""
           let accThinking = ""
-          let chunkCount = 0
+          let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
 
-          console.log("[v0] Starting stream read for panel", panelId)
           for await (const delta of parseSSEStream(reader)) {
-            chunkCount++
-            if (chunkCount <= 3) console.log("[v0] Panel", panelId, "chunk", chunkCount, "content:", delta.content.slice(0, 30), "thinking:", delta.thinking.slice(0, 30))
             accContent += delta.content
             accThinking += delta.thinking
+            if (delta.usage) lastUsage = delta.usage
 
             const contentNow = accContent
             const thinkingNow = accThinking
@@ -439,9 +447,11 @@ export function usePlayground() {
             )
           }
 
-          console.log("[v0] Stream done for panel", panelId, "total chunks:", chunkCount, "content length:", accContent.length)
           const finalContent = accContent
           const finalThinking = accThinking
+          const finalUsage = lastUsage
+            ? { prompt: lastUsage.prompt_tokens, completion: lastUsage.completion_tokens, total: lastUsage.total_tokens }
+            : undefined
 
           setPanels((prev) =>
             prev.map((p) =>
@@ -456,6 +466,7 @@ export function usePlayground() {
                             content: finalContent,
                             thinking: finalThinking || undefined,
                             isStreaming: false,
+                            tokenUsage: finalUsage,
                           }
                         : m
                     ),
@@ -468,7 +479,6 @@ export function usePlayground() {
 
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error"
-          console.log("[v0] Error for panel", panelId, ":", errorMessage)
 
           setPanels((prev) =>
             prev.map((p) =>
