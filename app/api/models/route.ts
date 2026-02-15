@@ -1,6 +1,8 @@
 
 import { NextResponse } from "next/server";
 
+export const runtime = "edge";
+
 // Define Provider Configurations
 // Using reference from .docs/AI_Provider_Models_API_Reference.md
 const PROVIDER_CONFIGS: Record<string, {
