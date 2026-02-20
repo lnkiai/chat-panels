@@ -10,11 +10,18 @@ import {
   Check,
   Type,
   AtSign,
+  Box,
+  ThumbsUp,
+  ThumbsDown,
+  Download,
+  X,
+  Paperclip,
 } from "lucide-react"
 import { TextShimmer } from "@/components/core/text-shimmer"
 import { motion, AnimatePresence } from "framer-motion"
 import { Streamdown } from "streamdown"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { PanelState, ChatMessage, PromptTemplate } from "@/lib/types"
 import { getAllProviders, getProvider } from "@/lib/ai-providers/registry"
 import { cn } from "@/lib/utils"
@@ -25,11 +32,18 @@ interface ChatPanelProps {
   totalPanels: number
   onUpdateSystemPrompt: (prompt: string) => void
   onUpdateTitle: (title: string) => void
-  onUpdateConfig?: (config: { providerId?: string; modelId?: string }) => void
+  onUpdateConfig?: (config: { providerId?: string; modelId?: string; apiKey?: string, baseUrl?: string }) => void
   enablePanelMode?: boolean
   templates?: PromptTemplate[]
   onApplyTemplate?: (content: string) => void
   availableProviders?: { id: string; name: string; models: { id: string; label: string; description?: string }[] }[]
+  onSend?: (message: string) => void
+  onExportPanel?: (panelId: number) => void
+  difyParameters?: any
+  onUpdateDifyInputs?: (panelId: number, inputs: Record<string, any>) => void
+  onRefreshDifyParameters?: (panelId: number) => void
+  onRegisterDifyApp?: (apiKey: string, baseUrl?: string) => Promise<void>
+  activeProviderId?: string
 }
 
 export function ChatPanel({
@@ -40,57 +54,24 @@ export function ChatPanel({
   enablePanelMode = false,
   templates = [],
   onApplyTemplate,
-  availableProviders
+  availableProviders,
+  onSend,
+  onExportPanel,
+  difyParameters,
+  onUpdateDifyInputs,
+  onRefreshDifyParameters,
+  onRegisterDifyApp,
+  activeProviderId
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [isRegisteringApp, setIsRegisteringApp] = useState(false)
   const [titleDraft, setTitleDraft] = useState(panel.title)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const [pendingParamFiles, setPendingParamFiles] = useState<Record<string, File[]>>({})
 
-  /* Scroll tracking for "new message" button */
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [isAtBottom, setIsAtBottom] = useState(true)
-  const [hasNewMessages, setHasNewMessages] = useState(false)
-  const prevMsgCountRef = useRef(panel.messages.length)
-
-  const checkIfAtBottom = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60
-    setIsAtBottom(atBottom)
-    if (atBottom) setHasNewMessages(false)
-  }, [])
-
-  useEffect(() => {
-    const currentCount = panel.messages.length
-    if (currentCount > prevMsgCountRef.current && !isAtBottom) {
-      setHasNewMessages(true)
-    }
-    prevMsgCountRef.current = currentCount
-  }, [panel.messages.length, isAtBottom])
-
-  useEffect(() => {
-    if (isAtBottom && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [panel.messages, isAtBottom])
-
-  const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
-      })
-      setHasNewMessages(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isEditingTitle && titleInputRef.current) {
-      titleInputRef.current.focus()
-      titleInputRef.current.select()
-    }
-  }, [isEditingTitle])
+  const effectiveProviderId = enablePanelMode ? (panel.providerId || activeProviderId) : activeProviderId
+  const effectiveModelId = enablePanelMode ? (panel.modelId || activeProviderId) : activeProviderId // Just for logic if needed, actually page.tsx sends the right one.
 
   const commitTitle = () => {
     const trimmed = titleDraft.trim()
@@ -102,62 +83,49 @@ export function ChatPanel({
     setIsEditingTitle(false)
   }
 
+  useEffect(() => {
+    if (isSystemPromptOpen && titleInputRef.current) {
+      titleInputRef.current.focus()
+    }
+  }, [isSystemPromptOpen])
+
+
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden bg-background border-r border-border/20 last:border-r-0">
-      {/* Panel header - visible on desktop only; mobile uses header-bar system prompt */}
-      <div className="shrink-0 hidden md:block">
-        <div className="flex items-center w-full px-3.5 py-2.5">
-          <motion.button
+      {/* Panel header */}
+      <div className="shrink-0 flex-col block z-10 border-b border-border/20 md:border-none">
+        <div className="flex items-center justify-between w-full px-3.5 py-2.5">
+          <button
             onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
-            aria-expanded={isSystemPromptOpen}
+            className="flex items-center gap-1 text-xs font-heading text-foreground hover:text-primary transition-colors group"
           >
             <motion.span
               animate={{ rotate: isSystemPromptOpen ? 90 : 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
             </motion.span>
-            <Settings2 className="h-3 w-3" />
-          </motion.button>
+            <span className="truncate max-w-[120px]">{panel.title}</span>
+            <Settings2 className="h-3 w-3 text-muted-foreground opacity-60 ml-1" />
+          </button>
 
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={commitTitle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitTitle()
-                if (e.key === "Escape") {
-                  setTitleDraft(panel.title)
-                  setIsEditingTitle(false)
-                }
-              }}
-              className="ml-2 text-xs font-heading bg-transparent border-b-2 border-primary outline-none px-0 py-0 w-24 text-foreground"
-              maxLength={30}
-            />
-          ) : (
-            <button
-              onClick={() => {
-                setTitleDraft(panel.title)
-                setIsEditingTitle(true)
-              }}
-              className="ml-2 flex items-center gap-1 text-xs font-heading text-foreground hover:text-primary transition-colors group"
-            >
-              <span>{panel.title}</span>
-              <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-            </button>
-          )}
-
-          {!isSystemPromptOpen && panel.systemPrompt.trim() && (
-            <span className="ml-auto text-[10px] text-muted-foreground/40 truncate min-w-0 flex-1 text-right pl-3">
-              {panel.systemPrompt}
-            </span>
-          )}
+          {/* Moved the stats/info to the right */}
+          <div className="flex items-center gap-2">
+            {!isSystemPromptOpen && panel.systemPrompt.trim() && (
+              <span className="text-[10px] text-muted-foreground/40 truncate min-w-[50px] flex-1 text-right">
+                {panel.systemPrompt}
+              </span>
+            )}
+            {!isSystemPromptOpen && (
+              <button
+                onClick={() => onExportPanel?.(panel.id)}
+                className="text-muted-foreground hover:text-primary transition-colors p-1"
+                title="エクスポート"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <AnimatePresence>
@@ -186,6 +154,22 @@ export function ChatPanel({
                       />
                       <ConfigDropdown
                         label="Model"
+                        displayValueOverride={(() => {
+                          const isDify = effectiveProviderId === "dify"
+                          if (isDify && difyParameters?.user_input_form && difyParameters?.user_input_form.length > 0) {
+                            const summary = difyParameters.user_input_form
+                              .filter((uf: any) => {
+                                const type = Object.keys(uf)[0]
+                                return !uf[type].hide
+                              })
+                              .map((uf: any) => {
+                                const type = Object.keys(uf)[0]
+                                return `${type}:${uf[type].variable}`
+                              }).join(", ")
+                            if (summary) return summary
+                          }
+                          return undefined
+                        })()}
                         value={panel.modelId || ""}
                         options={(() => {
                           const providers = availableProviders || getAllProviders().map(p => ({
@@ -201,8 +185,64 @@ export function ChatPanel({
                         disabled={!panel.providerId && (!availableProviders || availableProviders.length === 0)}
                       />
                     </div>
+
+                    {/* Dify Specific Settings */}
+                    {panel.providerId === "dify" && (
+                      <div className="mt-3 space-y-2 mb-4 p-3 bg-primary/5 border border-primary/10 rounded-xl">
+                        <p className="text-[10px] font-bold text-primary/80 uppercase tracking-wider">Dify App Settings</p>
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground ml-1">App API Key</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="password"
+                                className="flex-1 text-xs bg-background border border-border/60 rounded-lg px-2 py-1.5 focus:border-primary/40 focus:outline-none"
+                                value={panel.apiKey || ""}
+                                onChange={e => onUpdateConfig?.({ apiKey: e.target.value })}
+                                placeholder="App API Key (Overrides global)"
+                              />
+                              <button
+                                onClick={async () => {
+                                  if (!panel.apiKey) return
+                                  setIsRegisteringApp(true)
+                                  try {
+                                    await onRegisterDifyApp?.(panel.apiKey, panel.baseUrl)
+                                  } finally {
+                                    setIsRegisteringApp(false)
+                                  }
+                                }}
+                                disabled={isRegisteringApp || !panel.apiKey}
+                                className={cn(
+                                  "p-1.5 bg-primary/10 hover:bg-primary/20 rounded-lg text-primary transition-colors h-8",
+                                  (isRegisteringApp || !panel.apiKey) && "opacity-50 cursor-not-allowed"
+                                )}
+                                title="Register App as Model"
+                              >
+                                <Settings2 className={cn("h-3.5 w-3.5", isRegisteringApp && "animate-spin")} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {/* Panel Name Title edit inside settings */}
+                <div className="mb-2">
+                  <input
+                    ref={titleInputRef}
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onBlur={commitTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitTitle()
+                    }}
+                    className="w-full text-xs font-heading bg-transparent border-b border-border/40 hover:border-border outline-none focus:border-primary transition-colors px-1 py-1 text-foreground"
+                    placeholder="Panel Name"
+                    maxLength={30}
+                  />
+                </div>
 
                 {/* Template apply dropdown */}
                 {templates.length > 0 && onApplyTemplate && (
@@ -211,14 +251,231 @@ export function ChatPanel({
                     onApply={onApplyTemplate}
                   />
                 )}
-                <Textarea
-                  value={panel.systemPrompt}
-                  onChange={(e) => onUpdateSystemPrompt(e.target.value)}
-                  className="text-xs min-h-[80px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
-                  placeholder="System prompt..."
-                  rows={3}
-                />
-                <PromptStatsBar content={panel.systemPrompt} />
+                {/* System Prompt only for non-Dify */}
+                {effectiveProviderId !== "dify" && (
+                  <>
+                    <Textarea
+                      value={panel.systemPrompt}
+                      onChange={(e) => onUpdateSystemPrompt(e.target.value)}
+                      className="text-xs min-h-[80px] resize-none font-mono bg-background/60 border-border/60 rounded-xl focus-visible:ring-primary/30 focus-visible:border-primary/40 custom-scrollbar"
+                      placeholder="System prompt..."
+                      rows={3}
+                    />
+                    <PromptStatsBar content={panel.systemPrompt} />
+                  </>
+                )}
+
+                {/* Dify Custom Variables & Features */}
+                {effectiveProviderId === "dify" && (
+                  <div className="mt-4 space-y-3">
+                    {difyParameters?.user_input_form && difyParameters.user_input_form.length > 0 && (
+                      <div className="p-3 bg-muted/20 border border-border/40 rounded-xl mb-2 mx-1">
+                        <p className="text-xs font-semibold text-foreground/80 mb-3 ml-1">Dify Variables</p>
+                        <div className="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar px-1 pb-1">
+                          {difyParameters.user_input_form.map((uf: any, idx: number) => {
+                            const type = Object.keys(uf)[0]
+                            const field = uf[type]
+                            if (field.hide) return null
+
+                            return (
+                              <div key={idx} className="space-y-1">
+                                {type === "checkbox" ? (
+                                  <label className="flex items-center gap-2 cursor-pointer mt-2 pt-1 pb-1">
+                                    <input
+                                      type="checkbox"
+                                      className="peer appearance-none shrink-0 w-4 h-4 border border-border/60 rounded-sm bg-background checked:bg-primary checked:border-0 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer relative checked:after:content-[''] checked:after:absolute checked:after:left-[5px] checked:after:top-[2px] checked:after:w-[5px] checked:after:h-[9px] checked:after:border-r-2 checked:after:border-b-2 checked:after:border-white checked:after:rotate-45"
+                                      checked={panel.difyInputs?.[field.variable] ?? (field.default === "true" || field.default === true) ?? false}
+                                      onChange={e => onUpdateDifyInputs?.(panel.id, { [field.variable]: e.target.checked })}
+                                    />
+                                    <span className="text-[10.5px] text-muted-foreground">{field.label} {field.required && "*"}</span>
+                                  </label>
+                                ) : (
+                                  <>
+                                    <label className="text-[10px] text-muted-foreground ml-1">{field.label} {field.required && "*"}</label>
+                                    {type === "text-input" ? (
+                                      <input
+                                        type="text"
+                                        className="w-full text-xs bg-background border border-border/60 rounded-lg px-2.5 py-1.5 focus:border-primary/40 focus:outline-none transition-colors"
+                                        value={panel.difyInputs?.[field.variable] ?? field.default ?? ""}
+                                        onChange={e => onUpdateDifyInputs?.(panel.id, { [field.variable]: e.target.value })}
+                                        placeholder={field.label}
+                                      />
+                                    ) : type === "number" ? (
+                                      <input
+                                        type="number"
+                                        className="w-full text-xs bg-background border border-border/60 rounded-lg px-2.5 py-1.5 focus:border-primary/40 focus:outline-none transition-colors"
+                                        value={panel.difyInputs?.[field.variable] ?? field.default ?? ""}
+                                        onChange={e => onUpdateDifyInputs?.(panel.id, { [field.variable]: Number(e.target.value) })}
+                                        placeholder={field.label}
+                                      />
+                                    ) : type === "select" ? (
+                                      <Select
+                                        value={panel.difyInputs?.[field.variable] ?? field.default ?? ""}
+                                        onValueChange={(val) => onUpdateDifyInputs?.(panel.id, { [field.variable]: val })}
+                                      >
+                                        <SelectTrigger className="w-full text-[11px] h-8 bg-background border-border/60 focus:ring-primary/30">
+                                          <SelectValue placeholder={`Select ${field.label}`} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {field.options?.map((opt: string) => (
+                                            <SelectItem key={opt} value={opt} className="text-[11px]">
+                                              {opt}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    ) : type === "file" || type === "file-list" ? (
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex-1">
+                                            <input
+                                              type="text"
+                                              id={`dify-file-url-${panel.id}-${field.variable}`}
+                                              className="w-full text-xs bg-background border border-border/60 rounded-lg px-2.5 py-1.5 focus:border-primary/40 focus:outline-none transition-colors"
+                                              placeholder="File URL..."
+                                            />
+                                          </div>
+                                          <input
+                                            type="file"
+                                            id={`dify-file-${panel.id}-${field.variable}`}
+                                            className="hidden"
+                                            multiple={type === "file-list"}
+                                            accept={field.allowed_file_extensions?.map((ext: string) => `.${ext}`).join(",")}
+                                            onChange={e => {
+                                              const files = Array.from(e.target.files || [])
+                                              if (files.length > 0) {
+                                                setPendingParamFiles(prev => {
+                                                  const newFiles = type === "file-list" ? [...(prev[field.variable] || []), ...files] : files;
+                                                  (window as any)[`_pendingFiles_${panel.id}_${field.variable}`] = newFiles;
+                                                  return { ...prev, [field.variable]: newFiles };
+                                                });
+                                              }
+                                              e.target.value = ""; // reset
+                                            }}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => document.getElementById(`dify-file-${panel.id}-${field.variable}`)?.click()}
+                                            className="h-8 w-8 shrink-0 rounded-lg border border-border/60 bg-background flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-all shadow-sm"
+                                            title="Attach File"
+                                          >
+                                            <Paperclip className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                        {pendingParamFiles[field.variable]?.length > 0 && (
+                                          <div className="flex flex-col gap-1.5 mt-1">
+                                            {pendingParamFiles[field.variable].map((f, i) => (
+                                              <div key={i} className="flex items-center gap-2 bg-muted/40 px-2 py-1.5 rounded-md border border-border/40 justify-between">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                  <span className="text-[10px] text-foreground truncate">{f.name}</span>
+                                                  <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                                                    {(f.size / 1024).toFixed(1)} KB
+                                                  </span>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  className="text-muted-foreground hover:text-destructive shrink-0 transition-colors p-0.5"
+                                                  onClick={() => {
+                                                    setPendingParamFiles(prev => {
+                                                      const updated = (prev[field.variable] || []).filter((_, idx) => idx !== i);
+                                                      (window as any)[`_pendingFiles_${panel.id}_${field.variable}`] = updated;
+                                                      return { ...prev, [field.variable]: updated };
+                                                    });
+                                                  }}
+                                                >
+                                                  <X className="w-3 h-3" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : type === "json_object" ? (
+                                      <Textarea
+                                        className="text-[11px] font-mono min-h-[60px] resize-none bg-background/80 border border-border/60 rounded-lg focus-visible:ring-primary/30 py-1.5 px-2.5 custom-scrollbar transition-colors"
+                                        value={panel.difyInputs?.[field.variable] ?? field.default ?? ""}
+                                        onChange={e => onUpdateDifyInputs?.(panel.id, { [field.variable]: e.target.value })}
+                                        placeholder={field.label}
+                                        rows={3}
+                                      />
+                                    ) : (
+                                      <Textarea
+                                        className="text-xs min-h-[44px] resize-none bg-background/80 border border-border/60 rounded-lg focus-visible:ring-primary/30 py-1.5 px-2.5 custom-scrollbar transition-colors"
+                                        value={panel.difyInputs?.[field.variable] ?? field.default ?? ""}
+                                        onChange={e => onUpdateDifyInputs?.(panel.id, { [field.variable]: e.target.value })}
+                                        placeholder={field.label}
+                                        rows={2}
+                                      />
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {/* File Upload UI */}
+                    {difyParameters?.file_upload?.image?.enabled && (
+                      <div className="p-3 bg-muted/20 border border-border/40 rounded-xl relative mx-1 mb-4">
+                        <p className="text-xs font-semibold text-foreground/80 mb-2 flex items-center justify-between ml-1">
+                          <span>Attachments ({difyParameters.file_upload.image.number_limits || 1} max)</span>
+                        </p>
+
+                        {/* URL Method Support */}
+                        {(difyParameters.file_upload.image.transfer_methods?.includes("remote_url") || difyParameters.file_upload.allowed_file_upload_methods?.includes("remote_url")) && (
+                          <div className="mb-3">
+                            <input
+                              type="text"
+                              id={`dify-file-url-${panel.id}`}
+                              placeholder="Image/File URL..."
+                              className="w-full text-xs bg-background border border-border/60 rounded-lg px-2.5 py-1.5 focus:border-primary/40 focus:outline-none transition-colors"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {(difyParameters.file_upload.image.transfer_methods?.includes("local_file") || difyParameters.file_upload.allowed_file_upload_methods?.includes("local_file")) && (
+                            <>
+                              <input
+                                type="file"
+                                id={`dify-file-${panel.id}`}
+                                multiple={difyParameters.file_upload.image.number_limits > 1}
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || [])
+                                  if (files.length > 0) {
+                                    (window as any)[`_pendingFiles_${panel.id}`] = files;
+                                    const el = document.getElementById(`dify-file-label-${panel.id}`)
+                                    if (el) el.innerText = files.length === 1 ? `${files[0].name} (${(files[0].size / 1024).toFixed(1)}KB)` : `${files.length} files attached`
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                              <label htmlFor={`dify-file-${panel.id}`} className="flex items-center justify-center flex-1 h-9 border flex-col border-dashed border-border/80 rounded-lg bg-background/50 hover:bg-background cursor-pointer transition-colors shadow-sm">
+                                <span id={`dify-file-label-${panel.id}`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Click to Attach files</span>
+                              </label>
+                            </>
+                          )}
+                          <button
+                            title="Clear"
+                            className="h-9 w-9 flex shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background/50 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            onClick={() => {
+                              delete (window as any)[`_pendingFiles_${panel.id}`];
+                              const input = document.getElementById(`dify-file-${panel.id}`) as HTMLInputElement;
+                              if (input) input.value = '';
+                              const urlInput = document.getElementById(`dify-file-url-${panel.id}`) as HTMLInputElement;
+                              if (urlInput) urlInput.value = '';
+                              const el = document.getElementById(`dify-file-label-${panel.id}`)
+                              if (el) el.innerText = 'Click to Attach files'
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -228,55 +485,40 @@ export function ChatPanel({
       </div>
 
       {/* Messages area */}
-      <div
-        ref={scrollRef}
-        onScroll={checkIfAtBottom}
-        className="flex-1 overflow-y-auto min-h-0 custom-scrollbar relative"
-      >
-        {panel.messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-muted-foreground/50">
-              {"メッセージを入力してください"}
-            </p>
-          </div>
-        ) : (
-          <div className="px-3 md:px-4 flex flex-col gap-3 pt-4 pb-44 md:pt-4 md:pb-52">
-            {panel.messages.map((message, i) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isLast={i === panel.messages.length - 1}
-              />
-            ))}
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar relative flex flex-col">
+        <div className="flex-1 flex flex-col min-h-full">
+          {panel.messages.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center mt-20 md:mt-0 max-w-sm mx-auto">
+              <div className="h-14 w-14 rounded-2xl bg-card border border-border shadow-sm flex items-center justify-center mb-6 text-primary">
+                <Box className="h-6 w-6" />
+              </div>
+              <p className="text-xl font-medium tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent mb-3">
+                {panel.title}
+              </p>
+              <p className="text-[13px] leading-relaxed text-muted-foreground/80 balancetext">
+                システムのプロンプトを調整して、会話を始めてください。
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 md:p-6 pb-40 space-y-6">
+              {panel.messages.map((m, i) => (
+                <div key={m.id}>
+                  {m.role === "user" ? (
+                    <UserBubble content={m.content} />
+                  ) : (
+                    <AssistantMessage
+                      message={m}
+                      isLast={i === panel.messages.length - 1}
+                      onSend={onSend}
+                      providerId={effectiveProviderId || ""}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* New message / scroll-to-bottom button */}
-      <AnimatePresence>
-        {(!isAtBottom || hasNewMessages) && panel.messages.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="absolute left-0 right-0 bottom-8 z-30 flex justify-center pointer-events-none md:hidden"
-          >
-            <button
-              onClick={scrollToBottom}
-              className={cn(
-                "pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium transition-colors border shadow-sm",
-                hasNewMessages
-                  ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-card/90 backdrop-blur-sm text-muted-foreground border-border/50 hover:text-foreground"
-              )}
-            >
-              <ChevronDown className="h-3 w-3" />
-              <span>{hasNewMessages ? "新規メッセージ" : "最新へ"}</span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -295,7 +537,7 @@ function MessageBubble({
   if (message.role === "user") {
     return <UserBubble content={message.content} />
   }
-  return <AssistantMessage message={message} isLast={isLast} />
+  return <AssistantMessage message={message} isLast={isLast} providerId="" />
 }
 
 /* ------------------------------------------------------------------ */
@@ -385,9 +627,13 @@ function UserBubble({ content }: { content: string }) {
 function AssistantMessage({
   message,
   isLast,
+  onSend,
+  providerId,
 }: {
   message: ChatMessage
   isLast: boolean
+  onSend?: (message: string) => void
+  providerId: string
 }) {
   return (
     <motion.div
@@ -403,7 +649,7 @@ function AssistantMessage({
         />
       )}
 
-      <div className="text-sm leading-relaxed">
+      <div className="text-sm leading-relaxed mt-2">
         {message.content ? (
           <>
             <Streamdown isAnimating={!!message.isStreaming}>
@@ -426,8 +672,23 @@ function AssistantMessage({
         ) : null}
       </div>
 
+      {/* Suggested Questions */}
+      {message.suggestedQuestions && message.suggestedQuestions.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {message.suggestedQuestions.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSend?.(q)}
+              className="text-left max-w-full px-3 py-1.5 rounded-lg border border-border bg-muted/20 hover:bg-muted text-xs text-muted-foreground hover:text-foreground transition-all"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
       {message.content.trim() && !message.isStreaming && (
-        <AssistantStatsBar message={message} />
+        <AssistantStatsBar message={message} providerId={providerId} />
       )}
     </motion.div>
   )
@@ -437,8 +698,9 @@ function AssistantMessage({
 /*  Assistant stats bar (with real token usage)                        */
 /* ------------------------------------------------------------------ */
 
-function AssistantStatsBar({ message }: { message: ChatMessage }) {
+function AssistantStatsBar({ message, providerId }: { message: ChatMessage, providerId: string }) {
   const [copied, setCopied] = useState(false)
+  const [feedbackState, setFeedbackState] = useState<"like" | "dislike" | null>(null)
   const charCount = message.content.length
   const tokenEstimate = Math.ceil(charCount / 3)
 
@@ -448,51 +710,109 @@ function AssistantStatsBar({ message }: { message: ChatMessage }) {
     setTimeout(() => setCopied(false), 2000)
   }, [message.content])
 
+  const handleFeedback = async (rating: "like" | "dislike") => {
+    if (feedbackState === rating) return
+    const settingsData = localStorage.getItem("chat-panels-settings")
+    if (!settingsData) return
+    try {
+      const currentSettings = JSON.parse(settingsData)
+      const difyConfig = currentSettings.providerConfigs?.["dify"]
+      if (!difyConfig || !difyConfig.apiKey) return
+
+      const res = await fetch("/api/dify/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: message.id,
+          rating: rating,
+          apiKey: difyConfig.apiKey,
+          baseUrl: difyConfig.baseUrl
+        })
+      })
+      if (res.ok) {
+        setFeedbackState(rating)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const usage = message.tokenUsage
 
   return (
-    <div className="mt-2 flex items-center gap-2">
-      <button
-        onClick={handleCopy}
-        className={cn(
-          "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
-          copied
-            ? "bg-primary/10 text-primary"
-            : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/50"
-        )}
-      >
-        {copied ? (
-          <>
-            <Check className="h-2.5 w-2.5" />
-            <span>{"Copied!"}</span>
-          </>
-        ) : (
-          <>
-            <Copy className="h-2.5 w-2.5" />
-            <span>{"Copy"}</span>
-          </>
-        )}
-      </button>
+    <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleCopy}
+          className={cn(
+            "flex items-center gap-1 h-6 px-2 rounded-md text-[10px] transition-all",
+            copied
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/50"
+          )}
+        >
+          {copied ? (
+            <>
+              <Check className="h-2.5 w-2.5" />
+              <span>{"Copied!"}</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-2.5 w-2.5" />
+              <span>{"Copy"}</span>
+            </>
+          )}
+        </button>
 
-      <div className="h-3 w-px bg-border/30" />
+        {providerId === "dify" && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleFeedback("like")}
+              className={cn(
+                "flex items-center justify-center h-6 w-6 rounded-md transition-all",
+                feedbackState === "like"
+                  ? "bg-green-500/10 text-green-600"
+                  : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/50"
+              )}
+              title="Like"
+            >
+              <ThumbsUp className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => handleFeedback("dislike")}
+              className={cn(
+                "flex items-center justify-center h-6 w-6 rounded-md transition-all",
+                feedbackState === "dislike"
+                  ? "bg-red-500/10 text-red-600"
+                  : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/50"
+              )}
+              title="Dislike"
+            >
+              <ThumbsDown className="h-3 w-3" />
+            </button>
+          </div>
+        )}
 
-      <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/40">
-        <span className="flex items-center gap-0.5">
-          <Type className="h-2.5 w-2.5" />
-          {charCount.toLocaleString()} {"chars"}
-        </span>
-        {usage ? (
-          <>
-            <span>{usage.completion.toLocaleString()} {"tokens"}</span>
-            <span className="text-muted-foreground/30">
-              {"(prompt: "}{usage.prompt.toLocaleString()}{" / total: "}{usage.total.toLocaleString()}{")"}
-            </span>
-          </>
-        ) : (
-          <span>
-            {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
+        <div className="h-3 w-px bg-border/30 mx-1" />
+
+        <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground/40">
+          <span className="flex items-center gap-0.5">
+            <Type className="h-2.5 w-2.5" />
+            {charCount.toLocaleString()} {"chars"}
           </span>
-        )}
+          {usage ? (
+            <>
+              <span>{usage.completion.toLocaleString()} {"tokens"}</span>
+              <span className="text-muted-foreground/30">
+                {"(prompt: "}{usage.prompt.toLocaleString()}{" / total: "}{usage.total.toLocaleString()}{")"}
+              </span>
+            </>
+          ) : (
+            <span>
+              {"~"}{tokenEstimate.toLocaleString()} {"tokens"}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -694,34 +1014,36 @@ function ConfigDropdown({
   value,
   options,
   onChange,
-  disabled
+  disabled,
+  displayValueOverride
 }: {
   label: string
   value: string
   options: { id: string; label: string; description?: string }[]
   onChange: (val: string) => void
   disabled?: boolean
+  displayValueOverride?: string
 }) {
   const [open, setOpen] = useState(false)
   const selected = options.find(o => o.id === value)
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <motion.button
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         className={cn(
-          "w-full flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
-          "border border-border bg-background text-muted-foreground",
+          "w-full flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all max-w-full",
+          "border border-border bg-background text-muted-foreground overflow-hidden",
           "hover:border-primary/40 hover:text-foreground",
           open && "border-primary/40 text-foreground bg-primary/5",
           disabled && "opacity-50 cursor-not-allowed hover:border-border"
         )}
       >
-        <span className="truncate max-w-[120px] text-left">
-          {selected?.label || label}
+        <span className="truncate flex-1 min-w-0 text-left">
+          {displayValueOverride || selected?.label || label}
         </span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}

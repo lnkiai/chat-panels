@@ -10,11 +10,16 @@ export interface TokenUsage {
 
 export interface ChatMessage {
   id: string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "system"
   content: string
   thinking?: string
   isStreaming?: boolean
-  tokenUsage?: TokenUsage
+  tokenUsage?: {
+    prompt: number
+    completion: number
+    total: number
+  }
+  suggestedQuestions?: string[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -38,6 +43,10 @@ export interface PanelState {
   // Panel-specific overrides
   providerId?: string
   modelId?: string
+  apiKey?: string
+  baseUrl?: string
+  difyInputs?: Record<string, any>
+  difyParameters?: any
 }
 
 export interface PlaygroundSettings {
@@ -59,6 +68,8 @@ export interface PlaygroundSettings {
     enabled?: boolean
     models?: { id: string; label: string; description?: string }[]
     lastFetched?: number
+    difyParameters?: any
+    difyApps?: Array<{ apiKey: string; name: string; baseUrl: string; parameters?: any }>
   }>
 
   // Legacy fields for backward compatibility/migration

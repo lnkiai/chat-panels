@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
       stream: true,
       temperature: 0.7,
       maxTokens: 4096,
+      files: body.files,
+      difyInputs: body.difyInputs,
     })
 
     // Passthrough the SSE stream

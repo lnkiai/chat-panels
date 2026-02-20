@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { type PlaygroundSettings, type PanelState, type ChatMessage } from "@/lib/types"
-import { getProvider, getAllProviders, PROVIDER_REGISTRY, LONGCAT_PROVIDER } from "@/lib/ai-providers/registry"
+import { getProvider, getAllProviders, PROVIDER_REGISTRY, LONGCAT_PROVIDER, DIFY_PROVIDER } from "@/lib/ai-providers/registry"
 import type { ProviderConfig } from "@/lib/ai-providers/types"
 
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
@@ -66,6 +66,7 @@ function removeFromStorage(key: string) {
 /* ------------------------------------------------------------------ */
 
 interface SSEDelta {
+  id?: string
   content: string
   thinking: string
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
@@ -111,9 +112,11 @@ async function* parseSSEStream(
                 ? delta.reasoning
                 : "")
           : ""
+        const msgId = parsed.id
 
-        if (content || thinking || usage) {
+        if (content || thinking || usage || msgId) {
           yield {
+            id: msgId,
             content,
             thinking,
             usage: usage
@@ -141,8 +144,10 @@ async function* parseSSEStream(
             : typeof delta.reasoning_content === "string" ? delta.reasoning_content
               : typeof delta.reasoning === "string" ? delta.reasoning : "")
           : ""
-        if (content || thinking || usage) {
+        const msgId = parsed.id
+        if (content || thinking || usage || msgId) {
           yield {
+            id: msgId,
             content,
             thinking,
             usage: usage
@@ -162,8 +167,8 @@ async function* parseSSEStream(
 /* ------------------------------------------------------------------ */
 
 const DEFAULT_SETTINGS: PlaygroundSettings = {
-  activeProviderId: LONGCAT_PROVIDER.id,
-  activeModelId: LONGCAT_PROVIDER.models[0].id,
+  activeProviderId: DIFY_PROVIDER.id,
+  activeModelId: DIFY_PROVIDER.models[0].id,
   panelCount: 2,
   enablePanelMode: false,
   providerConfigs: {},
@@ -283,6 +288,8 @@ export function usePlayground() {
     saveToStorage(STORAGE_KEY_DRAFT, draft)
   }, [draft, hydrated])
 
+
+
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map())
 
   const settingsRef = useRef(settings)
@@ -330,12 +337,16 @@ export function usePlayground() {
     const provider = getProvider(providerId)
     if (!provider) return
 
-    setSettings((prev) => ({
-      ...prev,
-      activeProviderId: providerId,
-      // Reset/Update active model to first available model of new provider
-      activeModelId: provider.models[0].id
-    }))
+    setSettings((prev) => {
+      const dynamicModels = prev.providerConfigs?.[providerId]?.models || []
+      const activeModelId = dynamicModels.length > 0 ? dynamicModels[0].id : provider.models[0].id
+
+      return {
+        ...prev,
+        activeProviderId: providerId,
+        activeModelId
+      }
+    })
   }, [])
 
   // Updated to include organizationId
@@ -359,8 +370,15 @@ export function usePlayground() {
   const updateProviderModels = useCallback((providerId: string, models: { id: string; label: string; description?: string }[]) => {
     setSettings((prev) => {
       const currentConfigs = prev.providerConfigs || {}
+
+      let newActiveModelId = prev.activeModelId;
+      if (prev.activeProviderId === providerId && models.length > 0) {
+        newActiveModelId = models[0].id;
+      }
+
       return {
         ...prev,
+        activeModelId: newActiveModelId,
         providerConfigs: {
           ...currentConfigs,
           [providerId]: {
@@ -393,7 +411,7 @@ export function usePlayground() {
   )
 
   // Update panel-specific provider/model
-  const updatePanelConfig = useCallback((panelId: number, config: { providerId?: string, modelId?: string }) => {
+  const updatePanelConfig = useCallback((panelId: number, config: { providerId?: string, modelId?: string, apiKey?: string, baseUrl?: string }) => {
     setPanels((prev) =>
       prev.map((p) => {
         if (p.id !== panelId) return p
@@ -416,8 +434,161 @@ export function usePlayground() {
           updates.modelId = config.modelId
         }
 
+        if (config.apiKey !== undefined) {
+          updates.apiKey = config.apiKey
+        }
+
+        if (config.baseUrl !== undefined) {
+          updates.baseUrl = config.baseUrl
+        }
+
         return { ...p, ...updates }
       })
+    )
+  }, [])
+
+  const refreshDifyParameters = useCallback(async (panelId: number) => {
+    const panels = panelsRef.current
+    const panel = panels.find(p => p.id === panelId)
+    if (!panel) return
+
+    const providerId = panel.providerId || settingsRef.current.activeProviderId
+    if (providerId !== "dify") return
+
+    const apiKey = panel.apiKey || settingsRef.current.providerConfigs["dify"]?.apiKey
+    const baseUrl = panel.baseUrl || settingsRef.current.providerConfigs["dify"]?.baseUrl || "https://api.dify.ai/v1"
+
+    if (!apiKey) return
+
+    try {
+      const res = await fetch("/api/dify/parameters", {
+        headers: {
+          "x-dify-api-key": apiKey,
+          "x-dify-base-url": baseUrl
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPanels(prev => prev.map(p => p.id === panelId ? { ...p, difyParameters: data } : p))
+
+        // Also update the app list in settings if this API key is already known or should be added
+        setSettings(prev => {
+          const difyConfig = prev.providerConfigs["dify"] || {}
+          const apps = difyConfig.difyApps || []
+          const existingIdx = apps.findIndex(a => a.apiKey === apiKey)
+
+          if (existingIdx >= 0) {
+            const newApps = [...apps]
+            newApps[existingIdx] = { ...newApps[existingIdx], parameters: data }
+            return {
+              ...prev,
+              providerConfigs: {
+                ...prev.providerConfigs,
+                dify: { ...difyConfig, difyApps: newApps }
+              }
+            }
+          }
+          return prev
+        })
+      }
+    } catch (err) {
+      console.error("Failed to fetch Dify parameters", err)
+    }
+  }, [])
+
+  const registerDifyApp = useCallback(async (apiKey: string, baseUrl?: string) => {
+    const effectiveBaseUrl = baseUrl || settingsRef.current.providerConfigs["dify"]?.baseUrl || "https://api.dify.ai/v1"
+    if (!apiKey) return
+
+    try {
+      // 1. Fetch Info
+      const infoRes = await fetch("/api/dify/info", {
+        headers: {
+          "x-dify-api-key": apiKey,
+          "x-dify-base-url": effectiveBaseUrl
+        }
+      })
+      if (!infoRes.ok) throw new Error("Failed to fetch Dify app info")
+      const info = await infoRes.json()
+      const appName = info.name || info.app_name || "Dify App"
+
+      // 2. Fetch Params
+      const paramsRes = await fetch("/api/dify/parameters", {
+        headers: {
+          "x-dify-api-key": apiKey,
+          "x-dify-base-url": effectiveBaseUrl
+        }
+      })
+      if (!paramsRes.ok) throw new Error("Failed to fetch Dify app parameters")
+      const params = await paramsRes.json()
+
+      // 3. Update Settings
+      setSettings(prev => {
+        const difyConfig = prev.providerConfigs["dify"] || {}
+        const apps = difyConfig.difyApps || []
+        const existingIdx = apps.findIndex(a => a.apiKey === apiKey)
+
+        const newApp = { apiKey, name: appName, baseUrl: effectiveBaseUrl, parameters: params }
+        let newApps = [...apps]
+        if (existingIdx >= 0) {
+          newApps[existingIdx] = newApp
+        } else {
+          newApps.push(newApp)
+        }
+
+        const newModels = newApps.map(app => ({
+          id: app.apiKey,
+          label: app.name
+        }))
+
+        return {
+          ...prev,
+          providerConfigs: {
+            ...prev.providerConfigs,
+            dify: {
+              ...difyConfig,
+              difyApps: newApps,
+              models: newModels
+            }
+          }
+        }
+      })
+    } catch (err) {
+      console.error("Failed to register Dify app", err)
+      throw err
+    }
+  }, [])
+
+  const removeDifyApp = useCallback((apiKey: string) => {
+    setSettings(prev => {
+      const difyConfig = prev.providerConfigs["dify"] || {}
+      const apps = difyConfig.difyApps || []
+      const newApps = apps.filter(a => a.apiKey !== apiKey)
+
+      const newModels = newApps.map(app => ({
+        id: app.apiKey,
+        label: app.name
+      }))
+
+      return {
+        ...prev,
+        providerConfigs: {
+          ...prev.providerConfigs,
+          dify: {
+            ...difyConfig,
+            difyApps: newApps,
+            models: newModels
+          }
+        }
+      }
+    })
+  }, [])
+
+  const updateDifyInputs = useCallback((panelId: number, inputs: Record<string, any>) => {
+    setPanels((prev) =>
+      prev.map((p) =>
+        p.id === panelId ? { ...p, difyInputs: { ...p.difyInputs, ...inputs } } : p
+      )
     )
   }, [])
 
@@ -473,11 +644,11 @@ export function usePlayground() {
   /* ------ Send message ------ */
 
   const sendMessage = useCallback(
-    async (userMessage: string) => {
+    async (userMessage: string, fileId?: string) => {
       const snap = settingsRef.current
 
       // Basic validation
-      if (!userMessage.trim()) return
+      if (!userMessage.trim() && !fileId && !(window as any)._pendingFile) return
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -526,7 +697,18 @@ export function usePlayground() {
         // Get config for the effective provider
         const currentConfigs = currentSettings.providerConfigs || {}
         const currentProviderConfig = currentConfigs[effectiveProviderId]
-        const apiKey = currentProviderConfig?.apiKey || ""
+
+        let apiKey = panelSnapshot.apiKey || currentProviderConfig?.apiKey || ""
+        let baseUrl = panelSnapshot.baseUrl || currentProviderConfig?.baseUrl || ""
+
+        // If Dify, check if modelId is an API key from difyApps
+        if (effectiveProviderId === "dify" && currentProviderConfig?.difyApps) {
+          const app = currentProviderConfig.difyApps.find(a => a.apiKey === effectiveModelId)
+          if (app) {
+            apiKey = app.apiKey
+            baseUrl = app.baseUrl || baseUrl
+          }
+        }
 
         if (!apiKey) {
           // Error for this panel specifically
@@ -586,6 +768,79 @@ export function usePlayground() {
             { role: "user" as const, content: userMessage },
           ]
 
+          let files = undefined
+          const filesToUpload = (window as any)[`_pendingFiles_${panelId}`] || []
+          const fileUrlInput = document.getElementById(`dify-file-url-${panelId}`) as HTMLInputElement
+          const fileUrl = fileUrlInput?.value
+
+          if ((filesToUpload.length > 0 || fileUrl) && effectiveProviderId === "dify") {
+            const apiFiles: any[] = []
+
+            if (filesToUpload.length > 0) {
+              for (const fileToUpload of filesToUpload) {
+                const formData = new FormData()
+                formData.append("file", fileToUpload)
+                formData.append("user", "chat-panels-user")
+
+                const uploadRes = await fetch("/api/dify/upload", {
+                  method: "POST",
+                  headers: {
+                    "x-dify-api-key": apiKey,
+                    "x-dify-base-url": baseUrl || "https://api.dify.ai/v1"
+                  },
+                  body: formData
+                })
+                if (uploadRes.ok) {
+                  const uploadData = await uploadRes.json()
+                  if (uploadData.id) {
+                    apiFiles.push({
+                      type: fileToUpload.type.startsWith("image/") ? "image" : "document",
+                      transfer_method: "local_file",
+                      upload_file_id: uploadData.id
+                    })
+                  }
+                }
+              }
+            }
+
+            if (fileUrl) {
+              apiFiles.push({
+                type: "image",
+                transfer_method: "remote_url",
+                url: fileUrl
+              })
+            }
+
+            if (apiFiles.length > 0) {
+              files = apiFiles
+            }
+          }
+
+          let finalDifyInputs = { ...(panelSnapshot.difyInputs || {}) }
+          if (effectiveProviderId === "dify") {
+            const params = panelSnapshot.difyParameters ||
+              currentProviderConfig?.difyApps?.find(a => a.apiKey === effectiveModelId)?.parameters ||
+              currentProviderConfig?.difyParameters
+            if (params?.user_input_form) {
+              params.user_input_form.forEach((uf: any) => {
+                const type = Object.keys(uf)[0]
+                const field = uf[type]
+                if (field && field.variable && finalDifyInputs[field.variable] === undefined) {
+                  let def = field.default
+                  if (def !== undefined && def !== "") {
+                    finalDifyInputs[field.variable] = type === "number" ? Number(def) : (type === "checkbox" ? (def === "true" || def === true) : def)
+                  } else if (field.required) {
+                    if (type === "select" && Array.isArray(field.options) && field.options.length > 0) {
+                      finalDifyInputs[field.variable] = field.options[0]
+                    } else {
+                      finalDifyInputs[field.variable] = type === "number" ? 0 : (type === "checkbox" ? false : "")
+                    }
+                  }
+                }
+              })
+            }
+          }
+
           // Send provider context to API
           const response = await fetch("/api/chat", {
             method: "POST",
@@ -594,13 +849,15 @@ export function usePlayground() {
               providerId: effectiveProviderId,
               providerConfig: {
                 apiKey: apiKey,
-                baseUrl: currentProviderConfig?.baseUrl, // Optional override
+                baseUrl: baseUrl, // Optional override
                 organizationId: currentProviderConfig?.organizationId, // Optional
               },
               model: effectiveModelId,
               systemPrompt: panelSnapshot.systemPrompt,
               messages: messagesForApi,
               enableThinking: effectiveModelId.toLowerCase().includes("thinking"),
+              files: files,
+              difyInputs: finalDifyInputs
             }),
             signal: abortController.signal,
           })
@@ -623,8 +880,10 @@ export function usePlayground() {
           let accContent = ""
           let accThinking = ""
           let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
+          let realMessageId = assistantMsgId
 
           for await (const delta of parseSSEStream(reader)) {
+            if (delta.id) realMessageId = delta.id
             accContent += delta.content
             accThinking += delta.thinking
             if (delta.usage) lastUsage = delta.usage
@@ -659,6 +918,25 @@ export function usePlayground() {
             ? { prompt: lastUsage.prompt_tokens, completion: lastUsage.completion_tokens, total: lastUsage.total_tokens }
             : undefined
 
+          // Attempt to fetch suggested queries if Dify
+          let suggestedQuestions = undefined
+          if (effectiveProviderId === "dify" && apiKey && realMessageId) {
+            try {
+              const sugRes = await fetch(`/api/dify/suggested?message_id=${realMessageId}`, {
+                headers: {
+                  "x-dify-api-key": apiKey,
+                  "x-dify-base-url": currentProviderConfig?.baseUrl || ""
+                }
+              })
+              if (sugRes.ok) {
+                const sugData = await sugRes.json()
+                if (sugData.data && Array.isArray(sugData.data)) {
+                  suggestedQuestions = sugData.data
+                }
+              }
+            } catch (e) { }
+          }
+
           setPanels((prev) =>
             prev.map((p) =>
               p.id === panelId
@@ -669,10 +947,12 @@ export function usePlayground() {
                     m.id === assistantMsgId
                       ? {
                         ...m,
+                        id: realMessageId, // optionally, update local message id to real one
                         content: finalContent,
                         thinking: finalThinking || undefined,
                         isStreaming: false,
                         tokenUsage: finalUsage,
+                        suggestedQuestions
                       }
                       : m
                   ),
@@ -711,6 +991,11 @@ export function usePlayground() {
       })
 
       await Promise.allSettled(promises)
+
+      // Cleanup pending file
+      if ((window as any)._pendingFile) {
+        delete (window as any)._pendingFile
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -732,6 +1017,10 @@ export function usePlayground() {
     updateSystemPrompt,
     togglePanelMode,
     updatePanelConfig,
+    updateDifyInputs,
+    refreshDifyParameters,
+    registerDifyApp,
+    removeDifyApp,
     clearAllChats,
     clearApiKey,
     resetSystemPrompts,

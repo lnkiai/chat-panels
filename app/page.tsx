@@ -31,6 +31,10 @@ export default function PlaygroundPage() {
     clearEverything,
     sendMessage,
     updatePanelConfig,
+    updateDifyInputs,
+    refreshDifyParameters,
+    registerDifyApp,
+    removeDifyApp,
     updateActiveProvider,
     updateProviderConfig,
     updateProviderModels,
@@ -38,6 +42,42 @@ export default function PlaygroundPage() {
   } = usePlayground()
 
   const templateStore = useTemplates()
+
+  const exportAllChats = useCallback(() => {
+    let content = "# All Chats Export\n\n"
+    panels.forEach((p, i) => {
+      content += `## Panel ${i + 1}: ${p.title}\n`
+      content += `System Prompt: ${p.systemPrompt}\n\n`
+      p.messages.forEach(m => {
+        content += `### ${m.role === "user" ? "User" : "Assistant"}\n${m.content}\n\n`
+      })
+      content += `---\n\n`
+    })
+    const blob = new Blob([content], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `chat_export_${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [panels])
+
+  const exportPanelChats = useCallback((panelId: number) => {
+    const p = panels.find((x) => x.id === panelId)
+    if (!p) return
+    let content = `# ${p.title}\n\n`
+    content += `System Prompt: ${p.systemPrompt}\n\n`
+    p.messages.forEach(m => {
+      content += `### ${m.role === "user" ? "User" : "Assistant"}\n${m.content}\n\n`
+    })
+    const blob = new Blob([content], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${p.title}_export_${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [panels])
 
   const isAnyPanelLoading = panels.some((p) => p.isLoading)
   const count = settings.panelCount
@@ -130,6 +170,7 @@ export default function PlaygroundPage() {
           onClearApiKey={clearApiKey}
           onResetPrompts={resetSystemPrompts}
           onClearEverything={clearEverything}
+          onExportAllChats={exportAllChats}
           setMobilePromptOpen={setMobilePromptOpen}
           templates={templateStore.templates}
           onApplyTemplate={
@@ -142,6 +183,8 @@ export default function PlaygroundPage() {
           updateProviderConfig={updateProviderConfig}
           updateProviderModels={updateProviderModels}
           togglePanelMode={togglePanelMode}
+          onRegisterDifyApp={registerDifyApp}
+          onRemoveDifyApp={removeDifyApp}
         />
       </div>
 
@@ -175,6 +218,7 @@ export default function PlaygroundPage() {
                   onUpdateTitle={(title) =>
                     updatePanelTitle(panel.id, title)
                   }
+                  onExportPanel={exportPanelChats}
                   onUpdateConfig={(config) => updatePanelConfig(panel.id, config)}
                   enablePanelMode={settings.enablePanelMode}
                   templates={templateStore.templates}
@@ -182,6 +226,16 @@ export default function PlaygroundPage() {
                     updateSystemPrompt(panel.id, content)
                   }
                   availableProviders={effectiveProviders}
+                  onSend={sendMessage}
+                  difyParameters={
+                    panel.difyParameters ||
+                    settings.providerConfigs["dify"]?.difyApps?.find(a => a.apiKey === (panel.modelId || settings.activeModelId))?.parameters ||
+                    settings.providerConfigs["dify"]?.difyParameters
+                  }
+                  onUpdateDifyInputs={updateDifyInputs}
+                  onRefreshDifyParameters={refreshDifyParameters}
+                  onRegisterDifyApp={registerDifyApp}
+                  activeProviderId={settings.activeProviderId}
                 />
               </div>
             ))}
@@ -191,7 +245,7 @@ export default function PlaygroundPage() {
 
       {/* ============ MOBILE NAV DOTS ============ */}
       {showMobileDots && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-30 pointer-events-none">
+        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-30 pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-1.5">
             {panels.map((_, idx) => (
               <button

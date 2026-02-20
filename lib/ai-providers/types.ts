@@ -7,7 +7,7 @@ export interface AIModel {
 export interface ProviderConfig {
     id: string
     name: string
-    type: "openai_compatible" | "anthropic" | "gemini"
+    type: "openai_compatible" | "anthropic" | "gemini" | "dify"
     iconPath: string
     description?: string
     defaultBaseUrl?: string
@@ -31,4 +31,6 @@ export interface ChatCompletionRequest {
     maxTokens?: number
     stream?: boolean
     enableThinking?: boolean
+    files?: { type: string; transfer_method: string; url?: string; upload_file_id?: string }[]
+    difyInputs?: Record<string, any>
 }

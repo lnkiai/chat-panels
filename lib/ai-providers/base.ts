@@ -11,7 +11,8 @@ export abstract class BaseProvider {
     }
 
     get baseUrl() {
-        return this.credentials.baseUrl || this.config.defaultBaseUrl
+        const url = this.credentials.baseUrl?.trim()
+        return url ? url : this.config.defaultBaseUrl
     }
 
     get apiKey() {

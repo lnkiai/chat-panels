@@ -10,18 +10,18 @@ const PROVIDER_CONFIGS: Record<string, {
     method: "GET" | "POST",
     headers: (apiKey: string) => Record<string, string>,
     body?: (apiKey: string) => any, // For Zhipu
-    parser: (data: any) => { id: string, name: string, description?: string }[]
+    parser: (data: any, isCustom?: boolean) => { id: string, name: string, description?: string }[]
 }> = {
     "openai": {
         endpoint: "https://api.openai.com/v1/models",
         method: "GET",
         headers: (apiKey) => ({ "Authorization": `Bearer ${apiKey}` }),
-        parser: (data) => data.data
-            .filter((m: any) => /^(gpt-(4|5)|o[134])/.test(m.id) && !m.id.includes('realtime') && !m.id.includes('audio'))
+        parser: (data, isCustom) => data.data
+            .filter((m: any) => isCustom || (/^(gpt-(4|5)|o[134])/.test(m.id) && !m.id.includes('realtime') && !m.id.includes('audio')))
             .map((m: any) => ({
                 id: m.id,
                 name: m.id,
-                description: `OpenAI Model (Context: ${m.context_window || 'N/A'})`
+                description: isCustom ? "Custom/Compatible Model" : `OpenAI Model (Context: ${m.context_window || 'N/A'})`
             }))
             .sort((a: any, b: any) => a.id.localeCompare(b.id))
     },
@@ -104,18 +104,23 @@ const PROVIDER_CONFIGS: Record<string, {
 
 export async function POST(req: Request) {
     try {
-        const { providerId, apiKey } = await req.json();
+        const { providerId, apiKey, baseUrl } = await req.json();
 
         if (!providerId || !apiKey) {
             return NextResponse.json({ error: "Missing providerId or apiKey" }, { status: 400 });
         }
 
         const config = PROVIDER_CONFIGS[providerId];
-        if (!config) {
+        if (!config && providerId !== "openai") { // openai-compatibile check handled below, letting 'openai' config be a fallback
             return NextResponse.json({ error: "Unsupported provider" }, { status: 400 });
         }
 
-        let url = config.endpoint;
+        let url = config ? config.endpoint : "";
+
+        // If it's an OpenAI compatible endpoint and baseUrl is provided, use it
+        if (providerId === "openai" && baseUrl) {
+            url = baseUrl.endsWith('/') ? `${baseUrl}models` : `${baseUrl}/models`;
+        }
         // Special handling for Gemini usage of query param
         if (providerId === "gemini") {
             url += `?key=${apiKey}`;
@@ -133,7 +138,8 @@ export async function POST(req: Request) {
         }
 
         const data = await response.json();
-        const models = config.parser(data);
+        const isCustomEndpoint = !!baseUrl;
+        const models = config.parser(data, isCustomEndpoint);
 
         return NextResponse.json({ models });
 

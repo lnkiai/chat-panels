@@ -7,6 +7,7 @@ import {
   Settings2,
   X,
   Trash2,
+  Box,
   ClockFading,
   Minus,
   Plus,
@@ -16,10 +17,10 @@ import {
   BookmarkPlus,
   RefreshCw,
   Search,
-  Box,
   BrainCircuit,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Download
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -45,6 +46,7 @@ interface HeaderBarProps {
   onUpdateApiKey: (key: string) => void
   onUpdatePanelCount: (count: number) => void
   onClearChats: () => void
+  onExportAllChats?: () => void
   onClearApiKey: () => void
   onResetPrompts: () => void
   onClearEverything: () => void
@@ -59,9 +61,11 @@ interface HeaderBarProps {
 
   // Actions for provider config
   updateActiveProvider?: (providerId: string) => void
-  updateProviderConfig?: (providerId: string, config: { apiKey?: string; enabled?: boolean }) => void
+  updateProviderConfig?: (providerId: string, config: { apiKey?: string; baseUrl?: string; enabled?: boolean }) => void
   updateProviderModels?: (providerId: string, models: { id: string; label: string; description?: string }[]) => void
   togglePanelMode?: (enabled: boolean) => void
+  onRegisterDifyApp?: (apiKey: string, baseUrl?: string) => Promise<void>
+  onRemoveDifyApp?: (apiKey: string) => void
 }
 
 /* ------------------------------------------------------------------ */
@@ -120,6 +124,7 @@ export function HeaderBar({
   onUpdateApiKey,
   onUpdatePanelCount,
   onClearChats,
+  onExportAllChats,
   onClearApiKey,
   onClearEverything,
   setMobilePromptOpen,
@@ -129,7 +134,9 @@ export function HeaderBar({
   updateActiveProvider,
   updateProviderConfig,
   updateProviderModels,
-  togglePanelMode
+  togglePanelMode,
+  onRegisterDifyApp,
+  onRemoveDifyApp
 }: HeaderBarProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -216,15 +223,23 @@ export function HeaderBar({
   const displayModels = dynamicModels.length > 0 ? dynamicModels : staticModels
 
   const handleFetchModels = async () => {
-    if (!updateProviderModels || !selectedProviderConfig.apiKey) return
+    if (!selectedProviderConfig.apiKey) return
+
     setIsFetchingModels(true)
     try {
+      if (selectedProviderId === "dify" && onRegisterDifyApp) {
+        await onRegisterDifyApp(selectedProviderConfig.apiKey, selectedProviderConfig.baseUrl)
+        return
+      }
+
+      if (!updateProviderModels) return
       const res = await fetch("/api/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           providerId: selectedProviderId,
-          apiKey: selectedProviderConfig.apiKey
+          apiKey: selectedProviderConfig.apiKey,
+          baseUrl: selectedProviderConfig.baseUrl
         })
       })
       const data = await res.json()
@@ -264,36 +279,6 @@ export function HeaderBar({
           {/* Desktop Controls (Center) */}
           <div className="hidden md:flex items-center gap-4">
 
-            {/* Provider Link - Replaced with internal Drawer toggle */}
-            {activeProvider && !settings.enablePanelMode && (
-              <button
-                onClick={() => {
-                  const next = !providersOpen
-                  closeAllDrawers()
-                  if (next) {
-                    setProvidersOpen(true)
-                    setSelectedProviderId(settings.activeProviderId)
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors",
-                  providersOpen ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"
-                )}
-                title="Manage Providers"
-              >
-                <div className="h-8 w-8 rounded-md border border-border/60 bg-background/50 flex items-center justify-center overflow-hidden">
-                  <Image
-                    src={activeProvider.iconPath}
-                    alt={activeProvider.name}
-                    width={20}
-                    height={20}
-                    onError={(e) => { e.currentTarget.style.display = 'none' }}
-                  />
-                </div>
-                <span className="text-xs font-medium">{activeProvider.name}</span>
-              </button>
-            )}
-
             {/* Panel Mode Active Indicator */}
             {settings.enablePanelMode && (
               <button
@@ -314,38 +299,56 @@ export function HeaderBar({
                 <span className="text-xs font-medium text-foreground">Panel Mode</span>
               </button>
             )}
+          </div>
 
-            <div className="h-5 w-px bg-border/50" />
-
-
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-3">
+            <div className="hidden md:flex items-center gap-2 mr-2">
               <span className="text-xs text-muted-foreground">Panels</span>
               <PanelStepper count={settings.panelCount} onChange={onUpdatePanelCount} />
             </div>
-          </div>
 
-          {/* Right Controls (Unified) */}
-          <div className="flex items-center gap-0.5 md:gap-1">
-            {/* AI Providers Toggle (Visible on Mobile/Desktop) */}
+            {/* AI Providers Toggle (Unified with Active Provider) */}
             <motion.button
               onClick={() => {
                 const next = !providersOpen
                 closeAllDrawers()
                 if (next) {
                   setProvidersOpen(true)
-                  setSelectedProviderId(settings.activeProviderId) // Default to active
+                  setSelectedProviderId(settings.activeProviderId)
                 }
               }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.85 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
               className={cn(
-                "h-8 w-8 md:h-8 md:w-8 flex items-center justify-center rounded-xl transition-colors",
-                providersOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
+                "flex items-center gap-2 px-2 py-1.5 md:px-3 md:py-1.5 rounded-xl transition-all border",
+                providersOpen
+                  ? "border-primary/30 bg-primary/5 text-primary"
+                  : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
               title="AI Providers"
             >
-              <BrainCircuit className="h-4 w-4 md:h-4 md:w-4" />
+              {activeProvider && !settings.enablePanelMode && (
+                <>
+                  <div className="h-5 w-5 rounded shadow-sm border border-border/50 bg-background flex items-center justify-center overflow-hidden shrink-0">
+                    <Image
+                      src={activeProvider.iconPath}
+                      alt={activeProvider.name}
+                      width={14}
+                      height={14}
+                      className="object-contain"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium hidden md:block whitespace-nowrap">{activeProvider.name}</span>
+                </>
+              )}
+              {settings.enablePanelMode && (
+                <div className="h-5 w-5 rounded shadow-sm border border-primary/20 bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                  <Settings2 className="h-3 w-3 text-primary" />
+                </div>
+              )}
+              <Box className="h-3.5 w-3.5 md:h-4 md:w-4 ml-0.5 opacity-70" />
             </motion.button>
 
             {/* Templates Toggle */}
@@ -467,23 +470,36 @@ export function HeaderBar({
                   <p className="text-[10px] text-muted-foreground">
                     {manageCurrentTab.description}
                   </p>
-                  <motion.button
-                    onClick={handleDelete}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    className={cn(
-                      "flex items-center justify-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium transition-all",
-                      manageConfirming
-                        ? "bg-destructive text-destructive-foreground"
-                        : manageSelected === "all"
-                          ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
-                          : "bg-muted/60 text-foreground hover:bg-muted"
+                  <div className="flex items-center gap-2">
+                    {manageSelected === "chats" && onExportAllChats && !manageConfirming && (
+                      <motion.button
+                        onClick={onExportAllChats}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        className="flex items-center justify-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium transition-all bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>エクスポート</span>
+                      </motion.button>
                     )}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    <span>{manageConfirming ? "確定する" : "削除"}</span>
-                  </motion.button>
+                    <motion.button
+                      onClick={handleDelete}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium transition-all",
+                        manageConfirming
+                          ? "bg-destructive text-destructive-foreground"
+                          : manageSelected === "all"
+                            ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                            : "bg-muted/60 text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>{manageConfirming ? "確定する" : "削除"}</span>
+                    </motion.button>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -502,8 +518,8 @@ export function HeaderBar({
             >
               <div className="flex flex-col md:flex-row h-[420px] divide-y md:divide-y-0 md:divide-x divide-border/40">
                 {/* Left: Provider List */}
-                <div className="w-full md:w-56 overflow-y-auto custom-scrollbar bg-muted/10 p-2 space-y-1">
-                  <div className="px-2 py-1 mb-2">
+                <div className="w-full md:w-56 flex md:flex-col overflow-x-auto md:overflow-y-auto md:overflow-x-hidden custom-scrollbar bg-muted/10 p-2 gap-2 md:space-y-1 border-b md:border-b-0 border-border/40 shrink-0">
+                  <div className="hidden md:block px-2 py-1 mb-2 shrink-0">
                     <h3 className="text-xs font-semibold text-foreground/80">AI Providers</h3>
                   </div>
                   {getAllProviders().map(p => (
@@ -511,7 +527,7 @@ export function HeaderBar({
                       key={p.id}
                       onClick={() => setSelectedProviderId(p.id)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                        "w-auto md:w-full flex items-center gap-2.5 px-2 py-2 md:px-3 rounded-lg text-left transition-colors shrink-0",
                         selectedProviderId === p.id
                           ? "bg-primary/10 text-primary border border-primary/10"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
@@ -526,19 +542,19 @@ export function HeaderBar({
                           onError={(e) => { e.currentTarget.style.display = 'none' }}
                         />
                       </div>
-                      <span className="text-xs font-medium truncate">{p.name}</span>
+                      <span className="hidden md:block text-xs font-medium truncate">{p.name}</span>
                     </button>
                   ))}
 
-                  <div className="mt-4 px-2 py-1 mb-1">
+                  <div className="md:mt-4 hidden md:block px-2 py-1 mb-1 shrink-0">
                     <h3 className="text-xs font-semibold text-foreground/80">Options</h3>
                   </div>
                   {/* Panel Mode Toggle in list */}
                   <button
                     onClick={() => togglePanelMode?.(!settings.enablePanelMode)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors bg-muted/20 hover:bg-muted/40"
+                    className="w-auto md:w-full flex items-center justify-center md:justify-between px-3 py-2 rounded-lg text-left transition-colors bg-muted/20 hover:bg-muted/40 shrink-0"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 hidden md:flex">
                       <Box className="h-4 w-4 text-muted-foreground" />
                       <span className="text-xs font-medium">Panel Mode</span>
                     </div>
@@ -563,6 +579,7 @@ export function HeaderBar({
                               alt={selectedProviderDef.name}
                               width={24}
                               height={24}
+                              className={selectedProviderId === "dify" ? "h-6 w-6 object-contain p-0.5" : ""}
                             />
                           )}
                         </div>
@@ -590,24 +607,59 @@ export function HeaderBar({
                     {/* API Key Input */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">API Key</Label>
-                      <div className="relative">
+                      <div className="flex gap-2 relative">
                         <Input
                           type={showApiKey ? "text" : "password"}
                           value={selectedProviderConfig.apiKey || ""}
                           onChange={(e) => updateProviderConfig?.(selectedProviderId, { apiKey: e.target.value })}
                           placeholder={`Enter ${selectedProviderDef?.name} API Key`}
-                          className="text-xs font-mono h-9 pr-20 bg-background/50"
+                          className="text-xs font-mono h-9 pr-14 bg-background/50 flex-1"
                         />
                         <button
                           type="button"
                           onClick={() => setShowApiKey(!showApiKey)}
-                          className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-primary transition-colors"
+                          className="absolute right-[4.5rem] top-2.5 text-muted-foreground hover:text-primary transition-colors"
                         >
                           {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
+                        {selectedProviderId === "dify" && (
+                          <button
+                            onClick={async () => {
+                              if (!onRegisterDifyApp || !selectedProviderConfig.apiKey) return
+                              setIsFetchingModels(true)
+                              try {
+                                await onRegisterDifyApp(selectedProviderConfig.apiKey, selectedProviderConfig.baseUrl)
+                                updateProviderConfig?.(selectedProviderId, { apiKey: "" })
+                              } catch (e) {
+                                console.error(e)
+                              } finally {
+                                setIsFetchingModels(false)
+                              }
+                            }}
+                            disabled={isFetchingModels || !selectedProviderConfig.apiKey}
+                            className="px-3 h-9 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-lg transition-colors flex items-center justify-center shrink-0 disabled:opacity-50"
+                          >
+                            {isFetchingModels ? "Adding..." : "Add"}
+                          </button>
+                        )}
                       </div>
                       <p className="text-[10px] text-muted-foreground/60">
                         Keys are stored locally in your browser.
+                      </p>
+                    </div>
+
+                    {/* Custom Endpoint Input */}
+                    <div className="space-y-2 mt-4">
+                      <Label className="text-xs text-muted-foreground">Custom Endpoint (Base URL)</Label>
+                      <Input
+                        type="text"
+                        value={selectedProviderConfig.baseUrl || ""}
+                        onChange={(e) => updateProviderConfig?.(selectedProviderId, { baseUrl: e.target.value })}
+                        placeholder={selectedProviderDef?.defaultBaseUrl || "https://api.example.com/v1"}
+                        className="text-xs font-mono h-9 bg-background/50"
+                      />
+                      <p className="text-[10px] text-muted-foreground/60">
+                        Leave empty to use the default API endpoint.
                       </p>
                     </div>
 
@@ -615,22 +667,31 @@ export function HeaderBar({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs text-muted-foreground">Models ({displayModels.length})</Label>
-                        <button
-                          onClick={handleFetchModels}
-                          disabled={isFetchingModels || !selectedProviderConfig.apiKey}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/50 hover:bg-muted text-foreground text-[11px] font-medium rounded-lg transition-colors border border-border/40 disabled:opacity-50"
-                        >
-                          <RefreshCw className={cn("h-3.5 w-3.5", isFetchingModels && "animate-spin")} />
-                          <span>Fetch Models</span>
-                        </button>
+                        {selectedProviderId !== "dify" && (
+                          <button
+                            onClick={handleFetchModels}
+                            disabled={isFetchingModels || !selectedProviderConfig.apiKey}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/50 hover:bg-muted text-foreground text-[11px] font-medium rounded-lg transition-colors border border-border/40 disabled:opacity-50"
+                          >
+                            <RefreshCw className={cn("h-3.5 w-3.5", isFetchingModels && "animate-spin")} />
+                            <span>Fetch Models</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Models List - Fixed Height Scrollable */}
                       <div className="h-[200px] border border-border/60 rounded-xl bg-card/50 overflow-hidden flex flex-col">
                         <div className="overflow-y-auto custom-scrollbar p-1 space-y-1">
                           {displayModels.length === 0 ? (
-                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground py-10">
-                              No models found. Enter API Key and click Fetch.
+                            <div className="flex flex-col items-center justify-center h-full text-xs text-muted-foreground py-10 px-4 text-center space-y-2">
+                              {selectedProviderId === "dify" ? (
+                                <>
+                                  <p>No Dify Apps registered yet.</p>
+                                  <p className="text-[10px] opacity-80">Enter an App API Key and click Add to register an app.</p>
+                                </>
+                              ) : (
+                                "No models found. Enter API Key and click Fetch."
+                              )}
                             </div>
                           ) : (
                             displayModels.map((model) => (
@@ -641,7 +702,44 @@ export function HeaderBar({
                                     <div className="text-[10px] text-muted-foreground truncate">{model.description}</div>
                                   )}
                                 </div>
-                                <div className="text-[10px] font-mono text-muted-foreground/40">{model.id}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="text-[10px] font-mono text-muted-foreground/40 mt-[2px] mr-1">
+                                    {selectedProviderId === "dify" ? `${model.id.substring(0, 8)}...${model.id.substring(model.id.length - 4)}` : model.id}
+                                  </div>
+                                  {selectedProviderId === "dify" && onRemoveDifyApp && (
+                                    <>
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (onRegisterDifyApp) {
+                                            const btn = e.currentTarget;
+                                            const icon = btn.querySelector("svg");
+                                            if (icon) icon.classList.add("animate-spin");
+                                            try {
+                                              await onRegisterDifyApp(model.id, selectedProviderConfig.baseUrl);
+                                            } finally {
+                                              if (icon) icon.classList.remove("animate-spin");
+                                            }
+                                          }
+                                        }}
+                                        className="p-1 text-muted-foreground/40 hover:text-primary transition-colors rounded hover:bg-primary/10 shrink-0"
+                                        title="Refresh Parameters"
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          onRemoveDifyApp(model.id)
+                                        }}
+                                        className="p-1 text-muted-foreground/40 hover:text-destructive transition-colors rounded hover:bg-destructive/10 shrink-0"
+                                        title="Remove App"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             ))
                           )}
