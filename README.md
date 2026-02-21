@@ -149,3 +149,5 @@ Contributions are welcome! Please open an issue first to discuss what you'd like
 ## 📄 License
 
 [MIT](LICENSE) © Chat Panels Contributors
+
+Third-party licenses (fonts, UI components, npm packages): [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
