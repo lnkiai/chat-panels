@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
+  Github,
 } from "lucide-react"
 import {
   getAllProviders
@@ -347,8 +348,19 @@ export default function PlaygroundPage() {
         />
       </div>
 
-      {/* Floating Language Selector (PC Only) */}
-      <LanguageSelector className="fixed bottom-6 right-6 hidden md:block" />
+      {/* Floating Bottom-Right: GitHub + Language (PC Only) */}
+      <div className="fixed bottom-6 right-6 hidden md:flex items-center gap-2">
+        <a
+          href="https://github.com/lnkiai/chat-panels"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-8 w-8 items-center justify-center rounded-xl bg-card/80 backdrop-blur-sm border border-border/60 text-muted-foreground hover:text-foreground shadow-sm transition-colors"
+          title="View on GitHub"
+        >
+          <Github className="h-4 w-4" />
+        </a>
+        <LanguageSelector />
+      </div>
     </div>
   )
 }

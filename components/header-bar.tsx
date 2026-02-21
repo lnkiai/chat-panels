@@ -376,16 +376,6 @@ export function HeaderBar({
               <Box className="h-3.5 w-3.5 md:h-4 md:w-4 ml-0.5 opacity-70" />
             </motion.button>
 
-            {/* GitHub Link (Desktop only) */}
-            <a
-              href="https://github.com/lnkiai/chat-panels"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground transition-colors"
-              title="View on GitHub"
-            >
-              <Github className="h-4 w-4" />
-            </a>
 
             {/* Templates Toggle */}
             <motion.button
@@ -466,6 +456,20 @@ export function HeaderBar({
                     {t("language")}
                   </span>
                   <LanguageSelector modalMode={false} />
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-3">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-0 shrink-0">
+                    <Github className="w-4 h-4" />
+                    GitHub
+                  </span>
+                  <a
+                    href="https://github.com/lnkiai/chat-panels"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    lnkiai/chat-panels
+                  </a>
                 </div>
               </div>
             </motion.div>
@@ -720,16 +724,7 @@ export function HeaderBar({
                           </div>
                         )}
 
-                        {/* Language Selection (Mobile specific placement inside settings) */}
-                        <div className="flex items-center justify-between p-4 bg-background border border-border/60 rounded-xl shadow-sm mt-4 md:hidden">
-                          <div className="pr-4">
-                            <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                              <Languages className="h-3.5 w-3.5" />
-                              {t("language")}
-                            </h3>
-                          </div>
-                          <LanguageSelector modalMode={false} />
-                        </div>
+
                       </div>
                     </div>
                   ) : (
