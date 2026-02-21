@@ -45,6 +45,7 @@ interface ChatPanelProps {
   onRefreshDifyParameters?: (panelId: number) => void
   onRegisterDifyApp?: (apiKey: string, baseUrl?: string) => Promise<void>
   activeProviderId?: string
+  isAnyPanelLoading?: boolean
 }
 
 export function ChatPanel({
@@ -62,7 +63,8 @@ export function ChatPanel({
   onUpdateDifyInputs,
   onRefreshDifyParameters,
   onRegisterDifyApp,
-  activeProviderId
+  activeProviderId,
+  isAnyPanelLoading
 }: ChatPanelProps) {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false)
   const [isRegisteringApp, setIsRegisteringApp] = useState(false)
@@ -91,6 +93,15 @@ export function ChatPanel({
     }
   }, [isSystemPromptOpen])
 
+  const prevLoadingRef = useRef(isAnyPanelLoading)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (prevLoadingRef.current && !isAnyPanelLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+    prevLoadingRef.current = isAnyPanelLoading
+  }, [isAnyPanelLoading])
 
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden bg-background border-r border-border/20 last:border-r-0">
@@ -542,6 +553,7 @@ export function ChatPanel({
                 </div>
               ))}
               <div className="h-40 shrink-0" />
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>

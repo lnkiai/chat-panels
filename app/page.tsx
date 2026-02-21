@@ -275,6 +275,7 @@ export default function PlaygroundPage() {
                   onRefreshDifyParameters={refreshDifyParameters}
                   onRegisterDifyApp={registerDifyApp}
                   activeProviderId={settings.activeProviderId}
+                  isAnyPanelLoading={isAnyPanelLoading}
                 />
               </div>
             ))}
