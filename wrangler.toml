@@ -1,4 +1,10 @@
+# Cloudflare Pages configuration
+# This file is used by `wrangler pages deploy` (local CLI deployment).
+# For Git integration via Cloudflare Dashboard, configure build settings there directly.
+# See README.md "Deploy → Option A: Cloudflare Pages" for dashboard settings.
+
 name = "chat-panels"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
+

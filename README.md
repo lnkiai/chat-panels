@@ -44,8 +44,12 @@
    | **Framework preset** | `None` |
    | **Build command** | `npm run pages:build` |
    | **Build output directory** | `.vercel/output/static` |
+   | **Deploy command** | *(leave empty — do not fill in)* |
 
-5. Add environment variables:
+   > ⚠️ **Common mistake**: Do **not** set the Deploy command to `npx wrangler deploy`.  
+   > That command is for Workers projects. For Pages with Git integration, Cloudflare handles deployment automatically after the build — leave the Deploy command field blank.
+
+5. Add environment variables (under **Settings → Environment variables**):
 
    | Variable | Value |
    |----------|-------|
