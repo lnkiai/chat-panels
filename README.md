@@ -43,11 +43,13 @@
    |---------|-------|
    | **Framework preset** | `None` |
    | **Build command** | `npm run pages:build` |
+   | **Deploy command** | `npx wrangler pages deploy .vercel/output/static` |
    | **Build output directory** | `.vercel/output/static` |
-   | **Deploy command** | *(leave empty — do not fill in)* |
 
-   > ⚠️ **Common mistake**: Do **not** set the Deploy command to `npx wrangler deploy`.  
-   > That command is for Workers projects. For Pages with Git integration, Cloudflare handles deployment automatically after the build — leave the Deploy command field blank.
+   > **Note on commands:**
+   > - `npm run pages:build` runs `next build` + Cloudflare Pages transformation via `@cloudflare/next-on-pages`
+   > - The deploy command uses `wrangler pages deploy` (not `wrangler deploy` — that is for Workers)
+   > - The output path is always `.vercel/output/static` (this is where `@cloudflare/next-on-pages` writes its output)
 
 5. Add environment variables (under **Settings → Environment variables**):
 
