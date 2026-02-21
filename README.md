@@ -34,6 +34,8 @@
 
 ### Option A: Cloudflare Pages (Recommended)
 
+#### A-1. Via Git Integration (fork first)
+
 1. Fork this repository
 2. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
 3. Select your forked repository
@@ -43,13 +45,7 @@
    |---------|-------|
    | **Framework preset** | `None` |
    | **Build command** | `npm run pages:build` |
-   | **Deploy command** | `npx wrangler pages deploy .vercel/output/static` |
    | **Build output directory** | `.vercel/output/static` |
-
-   > **Note on commands:**
-   > - `npm run pages:build` runs `next build` + Cloudflare Pages transformation via `@cloudflare/next-on-pages`
-   > - The deploy command uses `wrangler pages deploy` (not `wrangler deploy` — that is for Workers)
-   > - The output path is always `.vercel/output/static` (this is where `@cloudflare/next-on-pages` writes its output)
 
 5. Add environment variables (under **Settings → Environment variables**):
 
@@ -58,6 +54,25 @@
    | `NODE_VERSION` | `20` |
 
 6. Click **Save and Deploy**
+
+#### A-2. Via "Deploy to Cloudflare Pages" Button
+
+When using the one-click deploy button above, the setup wizard shows pre-filled defaults that are designed for **Workers** projects. You must override them for this Pages project:
+
+| Field | Default (wrong) | Set this instead |
+|-------|----------------|-----------------|
+| **Build command** | `npm run build` | `npm run pages:build` |
+| **Deploy command** | `npx wrangler deploy` | `npx wrangler pages deploy .vercel/output/static` |
+| **Preview branch deploy command** | `npx wrangler versions upload` | `npx wrangler pages deploy .vercel/output/static` |
+| **Output path** | `/` | `.vercel/output/static` |
+| API Token | *(keep default)* | *(keep default)* |
+| `NODE_VERSION` | `20` | `20` ✅ |
+
+> **Why these changes?**
+> - `npm run pages:build` runs `next build` + the `@cloudflare/next-on-pages` transformation
+> - `wrangler deploy` is for **Workers** only — Pages requires `wrangler pages deploy`  
+> - `wrangler versions upload` is also Workers-specific; use the pages command for preview branches too
+> - The output path `.vercel/output/static` is where `@cloudflare/next-on-pages` writes its output
 
 > **Note**: No API keys are required as environment variables — users enter their own keys in the browser UI.
 
