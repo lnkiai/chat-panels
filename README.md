@@ -51,7 +51,7 @@
 
    | Variable | Value |
    |----------|-------|
-   | `NODE_VERSION` | `20` |
+   | `NODE_VERSION` | `20.18.0` |
 
 6. Click **Save and Deploy**
 
@@ -66,7 +66,7 @@ When using the one-click deploy button above, the setup wizard shows pre-filled 
 | **Preview branch deploy command** | `npx wrangler versions upload` | `npx wrangler pages deploy .vercel/output/static` |
 | **Output path** | `/` | `.vercel/output/static` |
 | API Token | *(keep default)* | *(keep default)* |
-| `NODE_VERSION` | `20` | `20` ✅ |
+| `NODE_VERSION` | `20` | `20.18.0` ✅ |
 
 > **Why these changes?**
 > - `npm run pages:build` runs `next build` + the `@cloudflare/next-on-pages` transformation
