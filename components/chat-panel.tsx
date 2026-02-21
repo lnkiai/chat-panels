@@ -738,18 +738,23 @@ function AssistantMessage({
                   <input {...props} className={cn("px-2 py-1.5 text-xs rounded-lg border border-border/60 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40", props.className)} />
                 ),
                 button: ({ node, ...props }: any) => {
-                  const dataMessage = props["data-message"] || props["dataMessage"]
+                  const dataMessage = props["data-message"] || props["dataMessage"] || props.value
                   return (
                     <button
                       {...props}
                       onClick={(e) => {
-                        if (dataMessage && onSend) {
+                        if (props.type !== "submit") {
                           e.preventDefault()
-                          onSend(dataMessage)
+                          if (onSend) {
+                            const msg = dataMessage || e.currentTarget.textContent || ""
+                            if (msg.trim()) {
+                              onSend(msg.trim())
+                            }
+                          }
                         }
                         if (props.onClick) props.onClick(e)
                       }}
-                      className={cn("mx-1 px-3 py-1.5 focus:ring-2 focus:ring-primary outline-none hover:bg-primary/90 bg-primary/80 shadow-md text-primary-foreground text-[11px] font-semibold rounded-lg transition-all border border-primary/20", props.className)}
+                      className={cn("mx-1 px-3 py-1 focus:ring-2 focus:ring-primary outline-none hover:bg-primary/20 bg-primary/10 text-primary text-xs font-semibold rounded-lg transition-colors border border-primary/20", props.className)}
                     />
                   )
                 },
