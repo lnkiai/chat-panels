@@ -3,7 +3,6 @@
 **Minimal multi-pane AI playground** — Compare and interact with multiple AI models side by side in your browser.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-chat--panels.pages.dev-blue?style=for-the-badge&logo=cloudflare)](https://chat-panels.pages.dev)
-[![Deploy to Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/lnkiai/chat-panels)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/lnkiai/chat-panels)
 
 ![Chat Panels – Multi-panel chat UI](public/images/chat-ui.png)
@@ -32,9 +31,13 @@
 
 ## 🚀 Deploy
 
-### Option A: Cloudflare Pages (Recommended)
+### Option A: Vercel (Easiest)
 
-#### A-1. Via Git Integration (fork first)
+1. Click the **Deploy with Vercel** button above, or fork this repository and import it on [Vercel](https://vercel.com/new)
+2. Use the default settings (Next.js is auto-detected)
+3. Click **Deploy**
+
+### Option B: Cloudflare Pages
 
 1. Fork this repository
 2. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
@@ -55,34 +58,7 @@
 
 6. Click **Save and Deploy**
 
-#### A-2. Via "Deploy to Cloudflare Pages" Button
-
-When using the one-click deploy button above, the setup wizard shows pre-filled defaults that are designed for **Workers** projects. You must override them for this Pages project:
-
-| Field | Default (wrong) | Set this instead |
-|-------|----------------|-----------------|
-| **Build command** | `npm run build` | `npm run pages:build` |
-| **Deploy command** | `npx wrangler deploy` | `npx wrangler pages deploy .vercel/output/static` |
-| **Preview branch deploy command** | `npx wrangler versions upload` | `npx wrangler pages deploy .vercel/output/static` |
-| **Output path** | `/` | `.vercel/output/static` |
-| API Token | *(keep default)* | *(keep default)* |
-| `NODE_VERSION` | `20` | `20.19.0` ✅ |
-
-> **Why these changes?**
-> - `npm run pages:build` runs `next build` + the `@cloudflare/next-on-pages` transformation
-> - `wrangler deploy` is for **Workers** only — Pages requires `wrangler pages deploy`  
-> - `wrangler versions upload` is also Workers-specific; use the pages command for preview branches too
-> - The output path `.vercel/output/static` is where `@cloudflare/next-on-pages` writes its output
-
 > **Note**: No API keys are required as environment variables — users enter their own keys in the browser UI.
-
-### Option B: Vercel
-
-1. Click the **Deploy with Vercel** button above, or:
-2. Fork this repository
-3. Import it on [Vercel](https://vercel.com/new)
-4. Use the default settings (Next.js is auto-detected)
-5. Click **Deploy**
 
 ### Option C: Run Locally
 
