@@ -6,7 +6,7 @@
 [![Deploy to Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/lnkiai/chat-panels)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/lnkiai/chat-panels)
 
-![Chat Panels Screenshot](public/og-image.png)
+![Chat Panels – Multi-panel chat UI](public/images/chat-ui.png)
 
 ## ✨ Features
 
@@ -19,6 +19,16 @@
 - **i18n support** — English and Japanese UI
 - **Responsive** — Works on desktop and mobile (swipe between panels)
 - **Edge Runtime** — Deployable to Cloudflare Pages and Vercel Edge Network
+
+### Dify Setup
+
+![Dify Settings](public/images/dify-settings.png)
+
+### OpenAI-compatible Endpoints
+
+> Works with any OpenAI-compatible API — including [Nebius AI](https://nebius.com/), [Together AI](https://www.together.ai/), [Groq](https://groq.com/), and more.
+
+![OpenAI-compatible Config](public/images/openai-config.png)
 
 ## 🚀 Deploy
 
@@ -72,14 +82,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## 🔑 Supported AI Providers
 
 | Provider | Notes |
-|----------|-------|
+|------------|-------|
 | **Dify** | Full Chat App API support (streaming, file upload, suggested questions) |
-| **OpenAI** | GPT-4o, GPT-4.1, o1, o3, o4-mini, and more |
-| **Anthropic** | Claude 3.5 Sonnet, Claude 3.7, and more |
-| **Google Gemini** | Gemini 2.0 Flash, Gemini 2.5 Pro, and more |
-| **OpenRouter** | Access 100+ models through a single API |
+| **OpenAI** | GPT-4o, o3-mini, GPT-5, and more |
+| **Anthropic** | Claude Sonnet 4.6, Claude Opus 4.6, Haiku 4.5, and more |
+| **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, and more |
+| **OpenRouter** | Access 400+ models through a single API |
 | **Longcat AI** | High-speed, long-context models |
-| **OpenAI-compatible** | Any custom endpoint that follows the OpenAI API format |
+| **OpenAI-compatible** | Any custom endpoint — Nebius, Together AI, Groq, Ollama, and more |
 
 > Each provider requires its own API key, which is stored only in your browser's local storage.
 
