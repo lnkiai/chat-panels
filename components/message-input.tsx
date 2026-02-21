@@ -228,7 +228,7 @@ export function MessageInput({
                             stiffness: 400,
                             damping: 25,
                           }}
-                          className="absolute bottom-full -left-2 sm:left-0 mb-2 w-[260px] sm:w-72 bg-card border border-border rounded-2xl overflow-hidden z-50 shadow-[0_4px_20px_rgba(62,168,255,0.08)] flex flex-col max-h-[300px] max-w-[calc(100vw-32px)]"
+                          className="absolute bottom-full right-0 mb-2 w-[260px] sm:w-72 bg-card border border-border rounded-2xl overflow-hidden z-50 shadow-[0_4px_20px_rgba(62,168,255,0.08)] flex flex-col max-h-[300px] max-w-[calc(100vw-32px)]"
                         >
                           <div className="overflow-y-auto custom-scrollbar">
                             {availableModels.length === 0 && (
