@@ -76,7 +76,7 @@ All packages listed below are distributed under the **MIT License** unless other
 | [date-fns](https://date-fns.org/) | — | date-fns contributors | MIT |
 | [next-themes](https://github.com/pacocoursey/next-themes) | — | Paco Coursey | MIT |
 | [input-otp](https://github.com/guilhermerodz/input-otp) | — | Guilherme Rodz | MIT |
-| [streamdown](https://github.com/lnkiai/streamdown) | 2.x | lnkiai | MIT |
+| [streamdown](https://github.com/lnkiai/streamdown) | 2.x | Vercel | Apache 2.0 |
 
 ### Build / Dev Tools
 
@@ -99,7 +99,7 @@ This application integrates with the following AI provider APIs. Their SDKs or c
 | Anthropic | https://anthropic.com | [Terms of Service](https://www.anthropic.com/legal/aup) |
 | Google Gemini | https://ai.google.dev | [Terms of Service](https://ai.google.dev/gemini-api/terms) |
 | OpenRouter | https://openrouter.ai | [Terms of Service](https://openrouter.ai/terms) |
-| Longcat AI | https://longcat.chat | — |
+| Longcat AI | https://longcat.chat | [Terms of Service](https://longcat.chat/platform/private/) |
 
 > API keys are entered by the user and stored only in their browser's localStorage. This application does not store or transmit API keys to any server operated by this project.
 
