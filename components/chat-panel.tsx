@@ -513,7 +513,7 @@ export function ChatPanel({
             </div>
           ) : (
             <div className="p-4 md:p-6 pb-48 space-y-6">
-              {panel.messages.length === 0 && difyParameters?.opening_statement && effectiveProviderId === "dify" && (
+              {difyParameters?.opening_statement && effectiveProviderId === "dify" && (
                 <div>
                   <AssistantMessage
                     message={{
