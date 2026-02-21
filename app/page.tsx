@@ -349,7 +349,7 @@ export default function PlaygroundPage() {
       </div>
 
       {/* Floating Bottom-Right: GitHub + Language (PC Only) */}
-      <div className="fixed bottom-6 right-6 hidden md:flex items-center gap-2">
+      <div className="fixed bottom-6 right-6 hidden md:flex items-center gap-2 z-30">
         <a
           href="https://github.com/lnkiai/chat-panels"
           target="_blank"
