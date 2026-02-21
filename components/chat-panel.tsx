@@ -697,15 +697,46 @@ function AssistantMessage({
             <Streamdown
               isAnimating={!!message.isStreaming}
               allowedTags={providerId === "dify" ? {
-                button: ["data-message", "style", "class"],
+                button: ["data-message", "style", "class", "type"],
                 span: ["style", "class"],
                 details: ["style", "class", "open", "close"],
                 summary: ["style", "class"],
                 br: [],
-                input: ["type", "placeholder", "style", "class", "checked"],
-                form: ["style", "class"]
+                input: ["type", "placeholder", "style", "class", "checked", "name", "value"],
+                form: ["style", "class"],
+                select: ["name", "style", "class"],
+                option: ["value"],
+                textarea: ["name", "placeholder", "style", "class"]
               } : undefined}
               components={providerId === "dify" ? {
+                form: ({ node, ...props }: any) => {
+                  return (
+                    <form
+                      {...props}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (onSend) {
+                          const formData = new FormData(e.currentTarget);
+                          const entries = Array.from(formData.entries());
+                          let out = "";
+                          if (entries.length === 1) {
+                            out = entries[0][1].toString();
+                          } else if (entries.length > 1) {
+                            out = entries.map(([k, v]) => `${k}: ${v}`).join('\n');
+                          }
+                          if (out.trim()) {
+                            onSend(out.trim());
+                          }
+                        }
+                        if (props.onSubmit) props.onSubmit(e);
+                      }}
+                      className={cn("my-3 p-3 border border-border/50 rounded-xl bg-muted/10 space-y-2", props.className)}
+                    />
+                  )
+                },
+                input: ({ node, ...props }: any) => (
+                  <input {...props} className={cn("px-2 py-1.5 text-xs rounded-lg border border-border/60 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40", props.className)} />
+                ),
                 button: ({ node, ...props }: any) => {
                   const dataMessage = props["data-message"] || props["dataMessage"]
                   return (
@@ -713,11 +744,12 @@ function AssistantMessage({
                       {...props}
                       onClick={(e) => {
                         if (dataMessage && onSend) {
+                          e.preventDefault()
                           onSend(dataMessage)
                         }
                         if (props.onClick) props.onClick(e)
                       }}
-                      className={cn("mx-1 px-3 py-1 focus:ring-2 focus:ring-primary outline-none hover:bg-primary/20 bg-primary/10 text-primary text-xs font-semibold rounded-lg transition-colors border border-primary/20", props.className)}
+                      className={cn("mx-1 px-3 py-1.5 focus:ring-2 focus:ring-primary outline-none hover:bg-primary/90 bg-primary/80 shadow-md text-primary-foreground text-[11px] font-semibold rounded-lg transition-all border border-primary/20", props.className)}
                     />
                   )
                 },
@@ -728,7 +760,7 @@ function AssistantMessage({
                 },
                 summary: ({ node, ...props }: any) => {
                   return (
-                    <summary {...props} className={cn("font-medium select-none", props.className)} />
+                    <summary {...props} className={cn("font-medium select-none text-primary/80", props.className)} />
                   )
                 }
               } : undefined}
