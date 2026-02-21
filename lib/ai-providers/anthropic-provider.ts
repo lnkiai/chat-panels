@@ -96,6 +96,7 @@ export class AnthropicProvider extends BaseProvider {
                 let buffer = ""
                 let messageId = ""
                 let inputTokens = 0
+                let eventType = ""
 
                 try {
                     while (true) {
@@ -106,7 +107,6 @@ export class AnthropicProvider extends BaseProvider {
                         const lines = buffer.split("\n")
                         buffer = lines.pop() ?? ""
 
-                        let eventType = ""
                         for (const line of lines) {
                             const trimmed = line.trim()
 
@@ -128,7 +128,7 @@ export class AnthropicProvider extends BaseProvider {
                                 }
 
                                 if (eventType === "content_block_delta") {
-                                    const text = parsed.delta?.text ?? ""
+                                    const text = parsed.delta?.text || parsed.delta?.thinking || ""
                                     if (text) {
                                         const chunk = {
                                             id: messageId,

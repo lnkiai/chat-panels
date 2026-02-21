@@ -490,19 +490,21 @@ export function HeaderBar({
                 {/* Export Section */}
                 {onExportAllChats && (
                   <div className="bg-secondary/40 rounded-xl p-3.5 border border-secondary/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h4 className="text-[13px] font-semibold text-foreground flex items-center gap-1.5"><Download className="h-4 w-4" /> {t("export")}</h4>
                       <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{t("exportDesc")}</p>
                     </div>
-                    <motion.button
-                      onClick={onExportAllChats}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.97 }}
-                      className="flex items-center justify-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium transition-all bg-background border border-border/60 hover:bg-secondary/80 text-foreground shrink-0 w-full sm:w-auto shadow-sm"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>{t("export")}</span>
-                    </motion.button>
+                    <div className="flex justify-end w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
+                      <motion.button
+                        onClick={onExportAllChats}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        className="flex items-center justify-center gap-1.5 h-8 px-4 rounded-lg text-xs font-medium transition-all bg-background border border-border/60 hover:bg-secondary/80 text-foreground shadow-sm"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>{t("export")}</span>
+                      </motion.button>
+                    </div>
                   </div>
                 )}
 
@@ -546,7 +548,7 @@ export function HeaderBar({
                           ? t("resetAllPanelsDesc")
                           : ""}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
                       <motion.button
                         onClick={handleDelete}
                         whileHover={{ scale: 1.02 }}
