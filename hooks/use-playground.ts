@@ -70,6 +70,7 @@ interface SSEDelta {
   content: string
   thinking: string
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+  conversation_id?: string
 }
 
 async function* parseSSEStream(
@@ -122,6 +123,7 @@ async function* parseSSEStream(
             usage: usage
               ? { prompt_tokens: usage.prompt_tokens ?? 0, completion_tokens: usage.completion_tokens ?? 0, total_tokens: usage.total_tokens ?? 0 }
               : undefined,
+            conversation_id: parsed.conversation_id
           }
         }
       } catch {
@@ -153,6 +155,7 @@ async function* parseSSEStream(
             usage: usage
               ? { prompt_tokens: usage.prompt_tokens ?? 0, completion_tokens: usage.completion_tokens ?? 0, total_tokens: usage.total_tokens ?? 0 }
               : undefined,
+            conversation_id: parsed.conversation_id
           }
         }
       } catch {
@@ -177,13 +180,7 @@ const DEFAULT_SETTINGS: PlaygroundSettings = {
   model: "",
 }
 
-const DEFAULT_PANELS: PanelState[] = [
-  createPanel(0),
-  createPanel(1),
-  createPanel(2),
-  createPanel(3),
-  createPanel(4),
-]
+const DEFAULT_PANELS: PanelState[] = Array.from({ length: 100 }, (_, i) => createPanel(i))
 
 /* ------------------------------------------------------------------ */
 /*  Hook                                                               */
@@ -246,8 +243,8 @@ export function usePlayground() {
     )
     const savedDraft = loadFromStorage<string>(STORAGE_KEY_DRAFT, "")
 
-    // Ensure 5 panels always exist (merge saved with defaults)
-    const mergedPanels = Array.from({ length: 5 }, (_, i) => {
+    // Ensure 100 panels always exist (merge saved with defaults)
+    const mergedPanels = Array.from({ length: 100 }, (_, i) => {
       const saved = savedPanels.find((p) => p.id === i)
       if (saved) {
         // Clear isLoading and isStreaming on restore
@@ -598,8 +595,16 @@ export function usePlayground() {
     abortControllersRef.current.forEach((controller) => controller.abort())
     abortControllersRef.current.clear()
     setPanels((prev) =>
-      prev.map((p) => ({ ...p, messages: [], isLoading: false }))
+      prev.map((p) => ({ ...p, messages: [], isLoading: false, difyConversationId: undefined }))
     )
+  }, [])
+
+  const resetPanels = useCallback(() => {
+    abortControllersRef.current.forEach((controller) => controller.abort())
+    abortControllersRef.current.clear()
+    setSettings((prev) => ({ ...prev, panelCount: 2 }))
+    setPanels(Array.from({ length: 100 }, (_, i) => createPanel(i)))
+    setDraft("")
   }, [])
 
   const clearApiKey = useCallback(() => {
@@ -650,10 +655,16 @@ export function usePlayground() {
       // Basic validation
       if (!userMessage.trim() && !fileId && !(window as any)._pendingFile) return
 
+      const pendingFiles = ((window as any)._pendingFiles || []) as File[]
+      const attachedFiles = pendingFiles.length > 0
+        ? pendingFiles.map(f => ({ name: f.name, type: f.type }))
+        : undefined
+
       const userMsg: ChatMessage = {
         id: generateId(),
         role: "user",
         content: userMessage,
+        attachedFiles: attachedFiles,
       }
 
       const currentSettings = { ...snap }
@@ -769,7 +780,7 @@ export function usePlayground() {
           ]
 
           let files = undefined
-          const filesToUpload = (window as any)[`_pendingFiles_${panelId}`] || []
+          const filesToUpload = (window as any)[`_pendingFiles_${panelId}`] || (window as any)._pendingFiles || []
           const fileUrlInput = document.getElementById(`dify-file-url-${panelId}`) as HTMLInputElement
           const fileUrl = fileUrlInput?.value
 
@@ -816,6 +827,14 @@ export function usePlayground() {
             }
           }
 
+          // Clear global pending files since they've been processed
+          if ((window as any)._pendingFiles) {
+            delete (window as any)._pendingFiles
+          }
+          if ((window as any)[`_pendingFiles_${panelId}`]) {
+            delete (window as any)[`_pendingFiles_${panelId}`]
+          }
+
           let finalDifyInputs = { ...(panelSnapshot.difyInputs || {}) }
           if (effectiveProviderId === "dify") {
             const params = panelSnapshot.difyParameters ||
@@ -825,15 +844,24 @@ export function usePlayground() {
               params.user_input_form.forEach((uf: any) => {
                 const type = Object.keys(uf)[0]
                 const field = uf[type]
-                if (field && field.variable && finalDifyInputs[field.variable] === undefined) {
-                  let def = field.default
-                  if (def !== undefined && def !== "") {
-                    finalDifyInputs[field.variable] = type === "number" ? Number(def) : (type === "checkbox" ? (def === "true" || def === true) : def)
-                  } else if (field.required) {
-                    if (type === "select" && Array.isArray(field.options) && field.options.length > 0) {
-                      finalDifyInputs[field.variable] = field.options[0]
+                if (field && field.variable) {
+                  if (type === "checkbox") {
+                    const val = finalDifyInputs[field.variable]
+                    if (val === undefined || val === "" || val === null) {
+                      finalDifyInputs[field.variable] = (field.default === "true" || field.default === true) || false
                     } else {
-                      finalDifyInputs[field.variable] = type === "number" ? 0 : (type === "checkbox" ? false : "")
+                      finalDifyInputs[field.variable] = (val === "true" || val === true)
+                    }
+                  } else if (finalDifyInputs[field.variable] === undefined) {
+                    let def = field.default
+                    if (def !== undefined && def !== "") {
+                      finalDifyInputs[field.variable] = type === "number" ? Number(def) : def
+                    } else if (field.required) {
+                      if (type === "select" && Array.isArray(field.options) && field.options.length > 0) {
+                        finalDifyInputs[field.variable] = field.options[0]
+                      } else {
+                        finalDifyInputs[field.variable] = type === "number" ? 0 : ""
+                      }
                     }
                   }
                 }
@@ -857,7 +885,8 @@ export function usePlayground() {
               messages: messagesForApi,
               enableThinking: effectiveModelId.toLowerCase().includes("thinking"),
               files: files,
-              difyInputs: finalDifyInputs
+              difyInputs: finalDifyInputs,
+              conversationId: panelSnapshot.difyConversationId
             }),
             signal: abortController.signal,
           })
@@ -881,9 +910,11 @@ export function usePlayground() {
           let accThinking = ""
           let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
           let realMessageId = assistantMsgId
+          let conversationId = panelSnapshot.difyConversationId
 
           for await (const delta of parseSSEStream(reader)) {
             if (delta.id) realMessageId = delta.id
+            if (delta.conversation_id) conversationId = delta.conversation_id
             accContent += delta.content
             accThinking += delta.thinking
             if (delta.usage) lastUsage = delta.usage
@@ -952,10 +983,13 @@ export function usePlayground() {
                         thinking: finalThinking || undefined,
                         isStreaming: false,
                         tokenUsage: finalUsage,
-                        suggestedQuestions
+                        suggestedQuestions,
+                        providerApiKey: apiKey,
+                        providerBaseUrl: currentProviderConfig?.baseUrl
                       }
                       : m
                   ),
+                  difyConversationId: conversationId
                 }
                 : p
             )
@@ -1024,6 +1058,7 @@ export function usePlayground() {
     clearAllChats,
     clearApiKey,
     resetSystemPrompts,
+    resetPanels,
     clearEverything,
     sendMessage,
     isLocalStorageAvailable

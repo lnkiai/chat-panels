@@ -20,6 +20,9 @@ export interface ChatMessage {
     total: number
   }
   suggestedQuestions?: string[]
+  providerApiKey?: string
+  providerBaseUrl?: string
+  attachedFiles?: any[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +50,7 @@ export interface PanelState {
   baseUrl?: string
   difyInputs?: Record<string, any>
   difyParameters?: any
+  difyConversationId?: string
 }
 
 export interface PlaygroundSettings {

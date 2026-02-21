@@ -9,7 +9,10 @@ export class DifyProvider extends BaseProvider {
     async createChatCompletion(request: ChatCompletionRequest): Promise<Response> {
         // Build Dify request
         const apiKey = this.credentials.apiKey
-        const baseUrl = this.credentials.baseUrl || "https://api.dify.ai/v1"
+        let baseUrl = this.credentials.baseUrl || "https://api.dify.ai/v1"
+        if (baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.slice(0, -1)
+        }
 
         if (!apiKey) {
             throw new Error("Missing Dify API Key")
@@ -17,31 +20,17 @@ export class DifyProvider extends BaseProvider {
 
         const url = `${baseUrl}/chat-messages`
 
-        // Prepare messages string and previous inputs if applying purely to dify format
-        let query = ""
-        request.messages.forEach(msg => {
-            query += `${msg.role.toUpperCase()}: ${msg.content}\n\n`
-        })
-
-        if (request.systemPrompt) {
-            query = `SYSTEM: ${request.systemPrompt}\n\n${query}`
-        }
-
-        const difyPayload = {
+        const difyPayload: any = {
             inputs: request.difyInputs || {},
             query: request.messages[request.messages.length - 1]?.content || "",
             response_mode: request.stream ? "streaming" : "blocking",
             user: "chat-panels-user",
             files: request.files || [],
-            // TODO: handle history appropriately for dify if conversation_id is tracked, 
         }
 
-        // Use prompt engineering if we must send history in `query`, or rely on dify specific session tracking.
-        // It's requested that the conversation history is kept in localstorage and Dify API /messages is NOT used to restore.
-        // So we just send the full context as the query for simplicity, or we can send only the last user query.
-        // Actually, if we send full history as query, it might cause issues if dify expects current user input.
-        // Let's send everything inside `query`.
-        difyPayload.query = query.trim()
+        if (request.conversationId) {
+            difyPayload.conversation_id = request.conversationId
+        }
 
         const response = await fetch(url, {
             method: "POST",
@@ -119,7 +108,7 @@ export class DifyProvider extends BaseProvider {
                                 }
 
                                 if (content || usage) {
-                                    const chunk = {
+                                    const chunk: any = {
                                         id: parsed.message_id,
                                         choices: [{
                                             delta: {
@@ -127,6 +116,9 @@ export class DifyProvider extends BaseProvider {
                                             }
                                         }],
                                         usage: usage
+                                    }
+                                    if (parsed.conversation_id) {
+                                        chunk.conversation_id = parsed.conversation_id
                                     }
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
                                 }

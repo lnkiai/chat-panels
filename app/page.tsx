@@ -4,9 +4,16 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { HeaderBar } from "@/components/header-bar"
 import { ChatPanel } from "@/components/chat-panel"
 import { MessageInput } from "@/components/message-input"
+import { LanguageSelector } from "@/components/language-selector"
 import { PlaygroundSkeleton } from "@/components/playground-skeleton"
 import { usePlayground } from "@/hooks/use-playground"
 import { useTemplates } from "@/hooks/use-templates"
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+} from "lucide-react"
 import {
   getAllProviders
 } from "@/lib/ai-providers/registry"
@@ -28,6 +35,7 @@ export default function PlaygroundPage() {
     clearAllChats,
     clearApiKey,
     resetSystemPrompts,
+    resetPanels,
     clearEverything,
     sendMessage,
     updatePanelConfig,
@@ -84,7 +92,10 @@ export default function PlaygroundPage() {
 
   // Check if current provider has API key
   const currentProviderConfig = settings.providerConfigs?.[settings.activeProviderId]
-  const hasApiKey = !!currentProviderConfig?.apiKey
+  let hasApiKey = !!currentProviderConfig?.apiKey
+  if (settings.activeProviderId === "dify") {
+    hasApiKey = (currentProviderConfig?.difyApps?.length || 0) > 0
+  }
 
   // Get available models for active provider
   const activeProvider = getAllProviders().find(p => p.id === settings.activeProviderId)
@@ -118,29 +129,34 @@ export default function PlaygroundPage() {
     if (activeIndex >= count) setActiveIndex(Math.max(0, count - 1))
   }, [count, activeIndex])
 
+  const visibleDesktopPanels = Math.min(count, 3)
+
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     const w = el.clientWidth
     if (w === 0) return
-    const idx = Math.round(el.scrollLeft / w)
+    const isMobileLayout = window.innerWidth < 768
+    const panelWidth = isMobileLayout ? w : w / Math.min(count, 3)
+    const idx = Math.round(el.scrollLeft / panelWidth)
     if (idx !== activeIndex) setMobilePromptOpen(false)
     setActiveIndex(idx)
-  }, [activeIndex])
+  }, [activeIndex, count])
 
-  const scrollToMobilePanel = useCallback(
+  const scrollToPanel = useCallback(
     (idx: number) => {
       const el = scrollRef.current
       if (!el) return
-      const clamped = Math.max(0, Math.min(count - 1, idx))
-      el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" })
+      const isMobileLayout = window.innerWidth < 768
+      const panelWidth = isMobileLayout ? el.clientWidth : el.clientWidth / Math.min(count, 3)
+      // On PC, you can't scroll past (count - visibleDesktopPanels)
+      const maxScrollIdx = isMobileLayout ? count - 1 : Math.max(0, count - Math.min(count, 3))
+      const clamped = Math.max(0, Math.min(maxScrollIdx, idx))
+      el.scrollTo({ left: clamped * panelWidth, behavior: "smooth" })
       setActiveIndex(clamped)
     },
     [count]
   )
-
-  // How many panels fit on desktop (always 1 on mobile via CSS)
-  const visibleDesktopPanels = Math.min(count, 3)
 
   // Mobile dots visible only when >1 panel on small screens
   const [isMobile, setIsMobile] = useState(false)
@@ -185,11 +201,33 @@ export default function PlaygroundPage() {
           togglePanelMode={togglePanelMode}
           onRegisterDifyApp={registerDifyApp}
           onRemoveDifyApp={removeDifyApp}
+          onResetPanels={resetPanels}
+          panels={panels}
+          updatePanelConfig={updatePanelConfig}
         />
       </div>
 
       {/* ============ PANELS ============ */}
       <div className="flex-1 relative min-h-0">
+        {/* PC Panel Nav Arrows (Left/Right Center) */}
+        {!isMobile && count > visibleDesktopPanels && activeIndex > 0 && (
+          <button
+            onClick={() => scrollToPanel(activeIndex - 1)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-40 p-2 bg-background/80 hover:bg-background border border-border shadow-md text-foreground rounded-full transition-transform hover:scale-105 active:scale-95"
+            aria-label="Previous panels"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        {!isMobile && count > visibleDesktopPanels && activeIndex < count - visibleDesktopPanels && (
+          <button
+            onClick={() => scrollToPanel(activeIndex + 1)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-40 p-2 bg-background/80 hover:bg-background border border-border shadow-md text-foreground rounded-full transition-transform hover:scale-105 active:scale-95"
+            aria-label="Next panels"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
         <div className="absolute inset-0">
           <div
             ref={scrollRef}
@@ -245,12 +283,19 @@ export default function PlaygroundPage() {
 
       {/* ============ MOBILE NAV DOTS ============ */}
       {showMobileDots && (
-        <div className="fixed bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-30 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-1.5">
+        <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex items-center gap-3 z-30 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
+          <button
+            onClick={() => scrollToPanel(activeIndex - 1)}
+            disabled={activeIndex <= 0}
+            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="flex items-center gap-1.5">
             {panels.map((_, idx) => (
               <button
                 key={idx}
-                onClick={() => scrollToMobilePanel(idx)}
+                onClick={() => scrollToPanel(idx)}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
                   idx === activeIndex
@@ -260,6 +305,13 @@ export default function PlaygroundPage() {
               />
             ))}
           </div>
+          <button
+            onClick={() => scrollToPanel(activeIndex + 1)}
+            disabled={activeIndex >= count - 1}
+            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -290,8 +342,13 @@ export default function PlaygroundPage() {
           mobilePromptOpen={mobilePromptOpen}
           setMobilePromptOpen={setMobilePromptOpen}
           enablePanelMode={settings.enablePanelMode}
+          activeProviderId={settings.activeProviderId}
+          onClearChats={clearAllChats}
         />
       </div>
+
+      {/* Floating Language Selector (PC Only) */}
+      <LanguageSelector className="fixed bottom-6 right-6 hidden md:block" />
     </div>
   )
 }

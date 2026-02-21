@@ -16,6 +16,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
             model: request.model,
             messages,
             stream: request.stream ?? true,
+            stream_options: (request.stream ?? true) ? { include_usage: true } : undefined,
             temperature: request.temperature ?? 0.7,
             max_tokens: request.maxTokens ?? 4096,
         }

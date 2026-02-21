@@ -9,6 +9,7 @@ interface ChatRequestBody extends ChatCompletionRequest {
     baseUrl?: string
     organizationId?: string
   }
+  conversationId?: string
 }
 
 export const runtime = "edge"
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       maxTokens: 4096,
       files: body.files,
       difyInputs: body.difyInputs,
+      conversationId: body.conversationId
     })
 
     // Passthrough the SSE stream

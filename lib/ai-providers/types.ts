@@ -33,4 +33,5 @@ export interface ChatCompletionRequest {
     enableThinking?: boolean
     files?: { type: string; transfer_method: string; url?: string; upload_file_id?: string }[]
     difyInputs?: Record<string, any>
+    conversationId?: string
 }

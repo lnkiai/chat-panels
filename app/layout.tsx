@@ -4,6 +4,7 @@ import { JetBrains_Mono } from 'next/font/google'
 
 import './globals.css'
 import 'streamdown/styles.css'
+import { I18nProvider } from '@/lib/i18n/context'
 
 const lineSeedRegular = localFont({
   src: '../public/fonts/LINESeedJP-Regular.ttf',
@@ -25,9 +26,28 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Longcat AI Playground',
-  description:
-    'Minimal multi-pane chat playground for comparing Longcat API model responses side by side.',
+  title: 'Chat Panels - AI Playground',
+  description: 'Minimal multi-pane AI playground for interacting with Dify, OpenAI, Gemini, Anthropic, and other top-tier models side by side.',
+  icons: {
+    icon: '/images/chat-panels.svg',
+    shortcut: '/images/chat-panels.svg',
+  },
+  openGraph: {
+    title: 'Chat Panels - Multi-Model AI Playground',
+    description: 'Compare AI models, interact side-by-side, and craft robust prompts easily.',
+    url: 'https://chat-panels.pages.dev',
+    siteName: 'Chat Panels',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1280,
+        height: 720,
+        alt: 'Chat Panels AI Dashboard',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
 }
 
 export const viewport: Viewport = {
@@ -48,7 +68,9 @@ export default function RootLayout({
       <body
         className={`${lineSeedRegular.variable} ${lineSeedBold.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        {children}
+        <I18nProvider>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   )

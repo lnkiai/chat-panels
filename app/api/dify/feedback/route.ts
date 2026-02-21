@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: "Missing required fields" }, { status: 400 })
         }
 
-        const difyBaseUrl = baseUrl || "https://api.dify.ai/v1"
+        let difyBaseUrl = baseUrl || "https://api.dify.ai/v1"
+        if (difyBaseUrl.endsWith('/')) difyBaseUrl = difyBaseUrl.slice(0, -1)
         const difyUrl = `${difyBaseUrl}/messages/${messageId}/feedbacks`
 
         const response = await fetch(difyUrl, {
