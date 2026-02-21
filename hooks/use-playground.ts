@@ -949,25 +949,6 @@ export function usePlayground() {
             ? { prompt: lastUsage.prompt_tokens, completion: lastUsage.completion_tokens, total: lastUsage.total_tokens }
             : undefined
 
-          // Attempt to fetch suggested queries if Dify
-          let suggestedQuestions = undefined
-          if (effectiveProviderId === "dify" && apiKey && realMessageId) {
-            try {
-              const sugRes = await fetch(`/api/dify/suggested?message_id=${realMessageId}`, {
-                headers: {
-                  "x-dify-api-key": apiKey,
-                  "x-dify-base-url": currentProviderConfig?.baseUrl || ""
-                }
-              })
-              if (sugRes.ok) {
-                const sugData = await sugRes.json()
-                if (sugData.data && Array.isArray(sugData.data)) {
-                  suggestedQuestions = sugData.data
-                }
-              }
-            } catch (e) { }
-          }
-
           setPanels((prev) =>
             prev.map((p) =>
               p.id === panelId
@@ -983,7 +964,6 @@ export function usePlayground() {
                         thinking: finalThinking || undefined,
                         isStreaming: false,
                         tokenUsage: finalUsage,
-                        suggestedQuestions,
                         providerApiKey: apiKey,
                         providerBaseUrl: currentProviderConfig?.baseUrl
                       }
