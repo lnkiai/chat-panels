@@ -26,6 +26,9 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://chat-panels.pages.dev'
+  ),
   title: 'Chat Panels - AI Playground',
   description: 'Minimal multi-pane AI playground for interacting with Dify, OpenAI, Gemini, Anthropic, and other top-tier models side by side.',
   icons: {

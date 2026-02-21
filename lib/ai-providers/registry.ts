@@ -2,6 +2,8 @@ import { ProviderConfig, ProviderCredentials } from "./types"
 import { BaseProvider } from "./base"
 import { OpenAICompatibleProvider } from "./openai-compatible"
 import { DifyProvider } from "./dify-provider"
+import { AnthropicProvider } from "./anthropic-provider"
+import { GeminiProvider } from "./gemini-provider"
 
 // Import definitions
 import { LONGCAT_PROVIDER } from "./definitions/longcat"
@@ -47,12 +49,10 @@ export function createProviderInstance(
             return new OpenAICompatibleProvider(providerConfig, credentials)
         case "dify":
             return new DifyProvider(providerConfig, credentials)
-        // For now, treat others as compatible or throw error until implemented
         case "anthropic":
+            return new AnthropicProvider(providerConfig, credentials)
         case "gemini":
-            // TODO: Implement specific providers. For now, try to use OpenAI compatible if feasible, or throw clearly.
-            // Given the request is just to "show" them, we can throw here.
-            throw new Error(`Provider implementation for ${providerConfig.type} is not yet available.`)
+            return new GeminiProvider(providerConfig, credentials)
         default:
             throw new Error(`Unsupported provider type: ${providerConfig.type}`)
     }

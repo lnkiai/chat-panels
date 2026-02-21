@@ -21,7 +21,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Download,
-  Languages
+  Languages,
+  Github
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -374,6 +375,17 @@ export function HeaderBar({
               )}
               <Box className="h-3.5 w-3.5 md:h-4 md:w-4 ml-0.5 opacity-70" />
             </motion.button>
+
+            {/* GitHub Link (Desktop only) */}
+            <a
+              href="https://github.com/lnkiai/chat-panels"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground transition-colors"
+              title="View on GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </a>
 
             {/* Templates Toggle */}
             <motion.button

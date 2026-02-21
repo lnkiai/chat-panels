@@ -50,7 +50,16 @@ const PROVIDER_CONFIGS: Record<string, {
             name: m.displayName || m.name,
             description: m.description || "Gemini Model"
         }))
-            .filter((m: any) => m.id.startsWith("gemini-") && !m.id.includes("vision")) // Filter out older/vision-only
+            .filter((m: any) => {
+                const id = m.id
+                // Only show generateContent-compatible models
+                return id.startsWith("gemini-") &&
+                    !id.includes("embedding") &&
+                    !id.includes("aqa") &&
+                    !id.includes("vision") &&
+                    // Prefer 2.5+ and 3+, drop deprecated 1.x and 2.0
+                    (id.includes("2.5") || id.includes("3-") || id.includes("exp"))
+            })
             .sort((a: any, b: any) => b.id.localeCompare(a.id)) || []
     },
     "deepseek": {

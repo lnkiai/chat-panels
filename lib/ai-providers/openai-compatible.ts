@@ -36,6 +36,13 @@ export class OpenAICompatibleProvider extends BaseProvider {
             headers["OpenAI-Organization"] = this.credentials.organizationId
         }
 
+        // OpenRouter requires these headers for proper attribution
+        if (this.config.id === "openrouter") {
+            headers["HTTP-Referer"] = "https://chat-panels.pages.dev"
+            headers["X-Title"] = "Chat Panels"
+        }
+
+
         try {
             const response = await fetch(url, {
                 method: "POST",

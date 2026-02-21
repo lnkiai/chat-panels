@@ -1,7 +1,24 @@
 {
-  "name": "my-project",
+  "name": "chat-panels",
   "version": "0.1.0",
-  "private": true,
+  "description": "Minimal multi-pane AI playground for comparing and interacting with multiple AI models side by side.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lnkiai/chat-panels"
+  },
+  "keywords": [
+    "ai",
+    "chat",
+    "playground",
+    "multi-model",
+    "dify",
+    "openai",
+    "gemini",
+    "anthropic",
+    "next.js",
+    "cloudflare-pages"
+  ],
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
