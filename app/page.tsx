@@ -283,44 +283,45 @@ export default function PlaygroundPage() {
         </div>
       </div>
 
-      {/* ============ MOBILE NAV DOTS ============ */}
-      {showMobileDots && (
-        <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex items-center gap-2 z-30 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-          {activeIndex > 0 && (
-            <button
-              onClick={() => scrollToPanel(activeIndex - 1)}
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div className="flex items-center gap-1.5 mx-1">
-            {panels.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => scrollToPanel(idx)}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  idx === activeIndex
-                    ? "w-5 bg-primary"
-                    : "w-1.5 bg-border hover:bg-muted-foreground/40"
-                )}
-              />
-            ))}
-          </div>
-          {activeIndex < count - 1 && (
-            <button
-              onClick={() => scrollToPanel(activeIndex + 1)}
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* Global Input (Overlay) */}
+
+      {/* Global Input (Overlay) & Mobile Nav Dots */}
       <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+        {/* ============ MOBILE NAV DOTS ============ */}
+        {showMobileDots && (
+          <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex items-center gap-2 z-30 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
+            {activeIndex > 0 && (
+              <button
+                onClick={() => scrollToPanel(activeIndex - 1)}
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 mx-1">
+              {panels.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => scrollToPanel(idx)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    idx === activeIndex
+                      ? "w-5 bg-primary"
+                      : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                  )}
+                />
+              ))}
+            </div>
+            {activeIndex < count - 1 && (
+              <button
+                onClick={() => scrollToPanel(activeIndex + 1)}
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
         <MessageInput
           onSend={sendMessage}
           disabled={!hasApiKey}
