@@ -285,15 +285,16 @@ export default function PlaygroundPage() {
 
       {/* ============ MOBILE NAV DOTS ============ */}
       {showMobileDots && (
-        <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex items-center gap-3 z-30 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-          <button
-            onClick={() => scrollToPanel(activeIndex - 1)}
-            disabled={activeIndex <= 0}
-            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <div className="flex items-center gap-1.5">
+        <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 flex items-center gap-2 z-30 pointer-events-auto bg-background/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
+          {activeIndex > 0 && (
+            <button
+              onClick={() => scrollToPanel(activeIndex - 1)}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 mx-1">
             {panels.map((_, idx) => (
               <button
                 key={idx}
@@ -307,13 +308,14 @@ export default function PlaygroundPage() {
               />
             ))}
           </div>
-          <button
-            onClick={() => scrollToPanel(activeIndex + 1)}
-            disabled={activeIndex >= count - 1}
-            className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {activeIndex < count - 1 && (
+            <button
+              onClick={() => scrollToPanel(activeIndex + 1)}
+              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 
