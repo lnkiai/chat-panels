@@ -51,6 +51,12 @@ export const metadata: Metadata = {
     locale: 'en_US',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Chat Panels - Multi-Model AI Playground',
+    description: 'Compare AI models, interact side-by-side, and craft robust prompts easily.',
+    images: ['/og-image.png'],
+  },
 }
 
 export const viewport: Viewport = {
